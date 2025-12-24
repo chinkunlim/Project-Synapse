@@ -1,0 +1,23 @@
+\documentclass[man, 12pt, a4paper]{apa7}
+\usepackage{xeCJK}
+\setCJKmainfont[AutoFakeBold=3, AutoFakeSlant=true]{PingFang TC}
+\setmainfont{Times New Roman}
+\usepackage[style=apa, sortcites=true, sorting=nyt, backend=biber]{biblatex}
+\addbibresource{references.bib}
+\usepackage{graphicx}
+\graphicspath{{Figure/}{./}}
+
+\input{sections/metadata}
+
+\title{\MyTitleEn}
+\shorttitle{\MyShortTitle}
+\author{\MyAuthorEn}
+\affiliation{\MyAffiliationEn}
+\abstract{\MyAbstractEn}
+\keywords{\MyKeywordsEn}
+
+\begin{document}
+\maketitle
+\input{sections/body}
+\printbibliography
+\end{document}

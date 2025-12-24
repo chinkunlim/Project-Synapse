@@ -1,5 +1,5 @@
-# 指定與您本機一致的 Python 3.14.2 版本
-FROM python:3.14.2-slim
+# 指定與您本機一致的 Python 3.12 版本
+FROM python:3.12-slim
 
 # 設定工作目錄
 WORKDIR /app

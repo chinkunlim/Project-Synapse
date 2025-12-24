@@ -1,0 +1,34 @@
+\documentclass[12pt]{article}
+\usepackage{cjpsych}
+\usepackage[style=apa, backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+% 讀取 Python 生成的 Metadata
+\input{sections/metadata}
+
+\title{\textbf{\fontsize{20}{30}\selectfont \MyTitleZh} \\ \vspace{0.5em} \textbf{\fontsize{18}{27}\selectfont \MyTitleEn}}
+\author{\MyAuthorZh \\ \MyAffiliationZh}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{center}\textbf{摘要}\end{center}
+\MyAbstractZh
+\vspace{1em} \\ \textbf{關鍵詞：}\MyKeywordsZh
+
+\newpage
+\begin{center}\textbf{Abstract}\end{center}
+\MyAbstractEn
+\vspace{1em} \\ \textbf{Keywords: }\MyKeywordsEn
+
+\newpage
+\setcounter{page}{1}
+
+% 讀取 Python 生成的章節清單
+\input{sections/body}
+
+\newpage
+\printbibliography[title=參考文獻]
+\end{document}

@@ -10,6 +10,9 @@ services:
       - .env
     networks:
       - synapse-network
+    depends_on:
+      - n8n
+      - pdf-worker
 
   # N8N 自動化服務
   n8n:
@@ -25,8 +28,19 @@ services:
     networks:
       - synapse-network
 
-networks:
-  synapse-network:
+  pdf-worker:
+    build: ./pdf_service
+    ports:
+      - "5002:5002"
+    networks:
+        - synapse-network
+    volumes:
+      - ./pdf_service:/app
 
 volumes:
   n8n_data:
+
+networks:
+  synapse-network:
+    driver: bridge
+  

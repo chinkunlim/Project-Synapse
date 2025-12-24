@@ -1,0 +1,155 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{cjpsych}
+
+% ==========================================
+% [1] 版面設定 (依據規範 p.3)
+% ==========================================
+\RequirePackage{geometry}
+% 邊界：上下的 2.4cm, 左右 2.5cm
+\geometry{a4paper, top=2.4cm, bottom=2.4cm, left=2.5cm, right=2.5cm}
+
+% ==========================================
+% [2] 字體與段落設定
+% ==========================================
+\RequirePackage{fontspec}
+\RequirePackage{xeCJK}
+\RequirePackage{setspace}
+\RequirePackage{indentfirst}
+
+% --- 字體設定 ---
+% 英文：Times New Roman (使用 TeX Gyre Termes 作為替代，風格一致)
+\setmainfont{TeX Gyre Termes}
+
+% 中文：新細明體風格 (使用 Noto Serif CJK TC，並開啟自動粗體/斜體)
+\setCJKmainfont[
+    BoldFont = Noto Serif CJK TC Bold,
+    ItalicFont = Noto Serif CJK TC,
+    AutoFakeSlant = true
+]{Noto Serif CJK TC}
+
+% --- 字號與行距 ---
+% 內文 12pt (LaTeX 預設 normalsize 對應 12pt 選項)
+\renewcommand{\normalsize}{\fontsize{12}{18}\selectfont}
+
+% 行距：中文 1.5 倍行距 (LaTeX 的 1.5 倍約為 \onehalfspacing)
+\onehalfspacing
+
+% 縮排：每段首行內縮 2 字元
+\setlength{\parindent}{2em}
+
+% ==========================================
+% [3] 標題層級設定 (依據規範 p.3 "標題層級")
+% ==========================================
+\RequirePackage{titlesec}
+\RequirePackage{zhnumber}
+
+% 層級一：無編號、置中、粗體 (Section)
+\titleformat{\section}[block]
+  {\centering\Large\bfseries} % 格式：置中、大字、粗體
+  {}                          % 編號：無
+  {0em}                       % 編號與標題距離
+  {}                          % 標題前內容
+
+% 層級二：編號 (一)、置左、粗體 (Subsection)
+\renewcommand{\thesubsection}{(\zhnumber{\arabic{subsection}})}
+\titleformat{\subsection}[hang]
+  {\large\bfseries}           % 格式：置左、粗體
+  {\thesubsection}            % 編號：(一)
+  {0.5em}                     % 距離
+  {}
+
+% 層級三：編號 1.、置左、粗體 (Subsubsection)
+\renewcommand{\thesubsubsection}{\arabic{subsubsection}.}
+\titleformat{\subsubsection}[hang]
+  {\normalsize\bfseries}      % 格式：正常字號、粗體
+  {\thesubsubsection}         % 編號：1.
+  {0.5em}
+  {}
+
+% 層級四：編號 (1)、置左、粗體、不換行 (Paragraph)
+% [runin] 代表標題後直接接內文，不換行
+\titleformat{\paragraph}[runin]
+  {\normalsize\bfseries}
+  {(\arabic{paragraph})}      % 編號：(1)
+  {0.5em}
+  {}
+  
+% 修正編號計數深度，確保到層級四都有編號
+\setcounter{secnumdepth}{4}
+
+% ==========================================
+% [4] 圖表設定 (依據規範 p.5-6)
+% ==========================================
+\RequirePackage{longtable}
+\RequirePackage{array}
+\RequirePackage{calc}
+\RequirePackage{booktabs}
+\RequirePackage{caption}
+\RequirePackage{graphicx}
+\RequirePackage{float}
+
+\graphicspath{{Figure/}{./}} 
+\floatstyle{plaintop}
+\restylefloat{figure}
+
+% 標題設定：
+% 1. 圖標置於圖之上 (position=top)
+% 2. 表標置於表之上
+% 3. 靠左對齊 (singlelinecheck=false, justification=raggedright)
+% 4. 標題與內容距離 (labelsep=quad)
+% 5. 名稱：圖、表
+\captionsetup{
+    position=top, 
+    labelsep=quad, 
+    singlelinecheck=false, 
+    justification=raggedright, 
+    font={bf} % 標題粗體
+}
+\captionsetup[table]{name=表}
+\captionsetup[figure]{name=圖}
+
+% ==========================================
+% [5] 參考文獻 (APA 7th)
+% ==========================================
+\RequirePackage[backend=biber, style=apa]{biblatex}
+\addbibresource{references.bib}
+
+% ==========================================
+% [6] 客製化表格/圖片註解環境 (Tab_Note)
+% ==========================================
+% 依據規範：在表、圖之下，靠左，小字體
+\newenvironment{tablenote}{%
+  \par              % 換段落
+  \vspace{2pt}      % 與上方物件保持微小距離
+  \noindent         % 取消縮排
+  \footnotesize     % 設定為小字體 (約 10pt)
+  \raggedright      % 靠左對齊
+}{%
+  \par
+}
+
+% ==========================================
+% [7] 重定義論文封面標題 (依據規範 p.3 "標題")
+% ==========================================
+% 規範：中文題目 20pt 粗體，英文題目 18pt 粗體，置中
+\renewcommand{\maketitle}{
+  \begin{center}
+    \vspace*{1cm}
+    % 中文標題：20pt
+    {\fontsize{20}{30}\bfseries \MyTitleZh \par}
+    \vspace{0.5em}
+    % 英文標題：18pt
+    {\fontsize{18}{27}\bfseries \MyTitleEn \par}
+    
+    \vspace{2cm}
+    
+    % 作者資訊 (使用 12pt)
+    {\large
+     \MyAuthorZh \par
+     \MyAuthorEn \par
+    }
+    
+    \vspace{2cm}
+    % 摘要與關鍵詞將由 main_cjp.tex 的 abstract 環境處理
+  \end{center}
+}

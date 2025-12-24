@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>論文編譯工廠 | Project Synapse</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .form-section { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); height: 100%; }
+        .upload-area { border: 2px dashed #dee2e6; border-radius: 8px; padding: 20px; text-align: center; background: #f8f9fa; transition: all 0.3s; }
+        .upload-area:hover { border-color: #0d6efd; background: #f1f7ff; }
+        /* 特別強調必填的區域 */
+        .upload-area.required-field { border-color: #dc3545; background: #fff8f8; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-dark">📄 論文編譯工廠</h2>
+            <a href="/" class="btn btn-outline-secondary">← 返回儀表板</a>
+        </div>
+
+        <form action="/thesis/convert" method="POST" enctype="multipart/form-data">
+            <div class="row g-4">
+                
+                <div class="col-lg-5">
+                    <div class="form-section">
+                        <h5 class="border-bottom pb-2 mb-3 fw-bold">⚙️ 1. 論文設定</h5>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark">輸出格式</label>
+                            <select name="output_format" class="form-select bg-light">
+                                <option value="cjp">中華心理學刊 (CJP)</option>
+                                <option value="apa">APA 7th 格式</option>
+                            </select>
+                        </div>
+
+                        <hr class="text-muted my-4">
+
+                        <h6 class="text-primary fw-bold mb-3">中文資訊 (Chinese)</h6>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">論文標題</label>
+                            <input type="text" name="title_zh" class="form-control" placeholder="例如：雙語教育之關鍵期研究" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">作者姓名</label>
+                            <input type="text" name="author_zh" class="form-control" placeholder="王小明" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">關鍵詞 (以頓號 、 分隔)</label>
+                            <input type="text" name="keywords_zh" class="form-control" placeholder="關鍵期、雙語、認知發展">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small text-muted">中文摘要</label>
+                            <textarea name="abstract_zh" class="form-control" rows="4" placeholder="請輸入中文摘要..."></textarea>
+                        </div>
+
+                        <h6 class="text-primary fw-bold mb-3">英文資訊 (English)</h6>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">English Title</label>
+                            <input type="text" name="title_en" class="form-control" placeholder="Study on...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Author Name</label>
+                            <input type="text" name="author_en" class="form-control" placeholder="Xiao-Ming Wang">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Keywords (separated by commas)</label>
+                            <input type="text" name="keywords_en" class="form-control" placeholder="Critical Period, Bilingualism">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">English Abstract</label>
+                            <textarea name="abstract_en" class="form-control" rows="4" placeholder="Abstract content..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="form-section d-flex flex-column">
+                        <h5 class="border-bottom pb-2 mb-3 fw-bold">📂 2. 檔案上傳</h5>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Markdown 內文 (.md) <span class="text-danger">*</span></label>
+                            <div class="upload-area">
+                                <input type="file" name="md_file" class="form-control" accept=".md" required>
+                                <small class="text-muted d-block mt-2">請上傳純文字檔，無需包含 YAML 檔頭</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">參考文獻 (.bib) <span class="text-danger">*</span></label>
+                            <div class="upload-area required-field">
+                                <input type="file" name="bib_file" class="form-control" accept=".bib" required>
+                                <small class="text-danger d-block mt-2 fw-bold">
+                                    ⚠️ 必須上傳：請確保 .bib 檔包含文中引用的所有文獻 (如 @lin2020)。
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">圖片附件 (Figures)</label>
+                            <div class="upload-area">
+                                <input type="file" name="figures" class="form-control" multiple>
+                                <small class="text-muted d-block mt-2">
+                                    支援多選上傳。文中引用範例：<code>![說明](Figure/fig1)</code>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto pt-4">
+                            <div class="alert alert-info d-flex align-items-center" role="alert">
+                                <div>
+                                    💡 <strong>提示：</strong> 系統會自動整合您填寫的資訊與上傳的檔案。編譯過程約需 10-30 秒。
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-dark w-100 py-3 fs-5 fw-bold shadow-sm">
+                                ⚡ 開始編譯並下載 PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+    <footer class="text-center text-muted py-4 small mt-5">
+        &copy; 2025 Project Synapse PDF Factory.
+    </footer>
+</body>
+</html>
