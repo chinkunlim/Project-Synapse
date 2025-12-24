@@ -2481,3 +2481,29 @@
  * Running on http://127.0.0.1:5001
  * Running on http://172.18.0.4:5001
 2025-12-24 16:53:49,045 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-24 16:56:13,379 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 16:56:13,381 - intergrations.notion.logging - INFO - 日誌系統已初始化
+2025-12-24 16:56:13,382 - intergrations.notion.logging - INFO - 日誌目錄: /app/logs
+2025-12-24 16:56:13,383 - intergrations.notion.logging - INFO - 日誌文件: app.log
+2025-12-24 16:56:13,384 - intergrations.notion.logging - INFO - 日誌級別: DEBUG
+2025-12-24 16:56:13,385 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 16:56:13,388 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 16:56:13,388 - intergrations.notion.logging - INFO - 日誌系統已初始化
+2025-12-24 16:56:13,389 - intergrations.notion.logging - INFO - 日誌目錄: /app/logs
+2025-12-24 16:56:13,390 - intergrations.notion.logging - INFO - 日誌文件: app.log
+2025-12-24 16:56:13,391 - intergrations.notion.logging - INFO - 日誌級別: DEBUG
+2025-12-24 16:56:13,392 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 16:56:13,498 - intergrations.notion.client - DEBUG - Notion API 客戶端已初始化: https://api.notion.com/v1
+2025-12-24 16:56:13,499 - intergrations.notion.processor - DEBUG - Notion 處理器已初始化
+2025-12-24 16:56:13,504 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://172.18.0.4:5001
+2025-12-24 16:56:13,506 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-25 01:32:08,687 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:32:08,690 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:32:08,691 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:32:08,691 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:32:08,692 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:32:08,693 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:32:08,693 - intergrations.notion.logging - INFO - ============================================================
