@@ -2507,3 +2507,188 @@
 2025-12-25 01:32:08,692 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
 2025-12-25 01:32:08,693 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
 2025-12-25 01:32:08,693 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:36:08,653 - httpcore.connection - DEBUG - close.started
+2025-12-25 01:36:08,658 - httpcore.connection - DEBUG - close.complete
+2025-12-25 01:36:08,659 - httpcore.connection - DEBUG - connect_tcp.started host='api.notion.com' port=443 local_address=None timeout=60.0 socket_options=None
+2025-12-25 01:36:08,686 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10a2c28b0>
+2025-12-25 01:36:08,690 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x10a0ca570> server_hostname='api.notion.com' timeout=60.0
+2025-12-25 01:36:08,711 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10a2c2f10>
+2025-12-25 01:36:08,712 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-12-25 01:36:08,714 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-12-25 01:36:08,714 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-12-25 01:36:08,715 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-12-25 01:36:08,716 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-12-25 01:36:09,015 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Wed, 24 Dec 2025 17:36:09 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'172'), (b'Connection', b'keep-alive'), (b'Server', b'cloudflare'), (b'CF-Ray', b'9b31dbf68d498282-TPE'), (b'CF-Cache-Status', b'DYNAMIC'), (b'ETag', b'W/"ac-GColiGISR9Ztr44+Mnge6w8oZ8g"'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Vary', b'Accept-Encoding'), (b'content-security-policy', b"default-src 'none'"), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'x-content-type-options', b'nosniff'), (b'x-dns-prefetch-control', b'off'), (b'x-download-options', b'noopen'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-notion-request-id', b'7187a5d8-80e8-48dc-aee6-3eb8e672a1ef'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-xss-protection', b'0'), (b'Set-Cookie', b'__cf_bm=n8A430fvJ_FwFJFdAlzUwiDTZ5rvTENQ2eHEbfMESSk-1766597769-1.0.1.1-p5CephFLZrwrdS_8O01ftGsezC4hr3aLkVLvwGpn7Mzfp0OxPjv9HpHoZl8cQmTu64jdsTF_.9BegEDRSRC09.rm2fmZTzwNxiR0lPG6p5U; path=/; expires=Wed, 24-Dec-25 18:06:09 GMT; domain=.notion.com; HttpOnly; Secure; SameSite=None'), (b'alt-svc', b'h3=":443"; ma=86400')])
+2025-12-25 01:36:09,022 - httpx - INFO - HTTP Request: POST https://api.notion.com/v1/databases/2d3a49006a17803da471f10e6ed697f0/query "HTTP/1.1 400 Bad Request"
+2025-12-25 01:36:09,023 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-12-25 01:36:09,024 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-12-25 01:36:09,025 - httpcore.http11 - DEBUG - response_closed.started
+2025-12-25 01:36:09,026 - httpcore.http11 - DEBUG - response_closed.complete
+2025-12-25 01:36:09,028 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:36:09] "GET / HTTP/1.1" 200 -
+2025-12-25 01:36:11,403 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:36:11] "GET /notion HTTP/1.1" 200 -
+2025-12-24 17:36:50,854 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:36:50,858 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-24 17:36:50,860 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /app/logs
+2025-12-24 17:36:50,861 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-24 17:36:50,862 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-24 17:36:50,862 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-24 17:36:50,863 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:36:50,866 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:36:50,867 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-24 17:36:50,868 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /app/logs
+2025-12-24 17:36:50,869 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-24 17:36:50,870 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-24 17:36:50,871 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-24 17:36:50,871 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:36:50,941 - intergrations.notion.client - INFO - ✅ Notion API 客戶端初始化完成
+2025-12-24 17:36:50,943 - intergrations.notion.client - DEBUG -    基礎 URL: https://api.notion.com/v1
+2025-12-24 17:36:50,944 - intergrations.notion.client - DEBUG -    API 版本: 2022-06-28
+2025-12-24 17:36:50,945 - intergrations.notion.processor - DEBUG - ✅ Notion 處理器已初始化完成
+2025-12-24 17:36:50,951 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://172.18.0.4:5001
+2025-12-24 17:36:50,953 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-24 17:37:07,996 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:37:07,998 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-24 17:37:07,999 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /app/logs
+2025-12-24 17:37:08,000 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-24 17:37:08,001 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-24 17:37:08,002 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-24 17:37:08,003 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:37:08,005 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:37:08,006 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-24 17:37:08,007 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /app/logs
+2025-12-24 17:37:08,008 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-24 17:37:08,008 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-24 17:37:08,009 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-24 17:37:08,010 - intergrations.notion.logging - INFO - ============================================================
+2025-12-24 17:37:08,111 - intergrations.notion.client - INFO - ✅ Notion API 客戶端初始化完成
+2025-12-24 17:37:08,112 - intergrations.notion.client - DEBUG -    基礎 URL: https://api.notion.com/v1
+2025-12-24 17:37:08,113 - intergrations.notion.client - DEBUG -    API 版本: 2022-06-28
+2025-12-24 17:37:08,114 - intergrations.notion.processor - DEBUG - ✅ Notion 處理器已初始化完成
+2025-12-24 17:37:08,119 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://172.18.0.4:5001
+2025-12-24 17:37:08,120 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-25 01:39:39,986 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:39:39,990 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:39:39,991 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:39:39,992 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:39:39,994 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:39:39,995 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:39:39,996 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:39:40,005 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:39:40,009 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:39:40,010 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:39:40,011 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:39:40,012 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:39:40,013 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:39:40,022 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:39:40,107 - intergrations.notion.client - INFO - ✅ Notion API 客戶端初始化完成
+2025-12-25 01:39:40,108 - intergrations.notion.client - DEBUG -    基礎 URL: https://api.notion.com/v1
+2025-12-25 01:39:40,109 - intergrations.notion.client - DEBUG -    API 版本: 2022-06-28
+2025-12-25 01:39:40,110 - intergrations.notion.processor - DEBUG - ✅ Notion 處理器已初始化完成
+2025-12-25 01:40:15,381 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:40:15,383 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:40:15,384 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:40:15,385 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:40:15,386 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:40:15,386 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:40:15,387 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:40:15,388 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:40:15,389 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:40:15,390 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:40:15,391 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:40:15,392 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:40:15,392 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:40:15,393 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:40:15,442 - intergrations.notion.client - INFO - ✅ Notion API 客戶端初始化完成
+2025-12-25 01:40:15,443 - intergrations.notion.client - DEBUG -    基礎 URL: https://api.notion.com/v1
+2025-12-25 01:40:15,443 - intergrations.notion.client - DEBUG -    API 版本: 2022-06-28
+2025-12-25 01:40:15,444 - intergrations.notion.processor - DEBUG - ✅ Notion 處理器已初始化完成
+2025-12-25 01:40:15,482 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://134.208.32.34:5001
+2025-12-25 01:40:15,484 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-25 01:40:26,271 - httpcore.connection - DEBUG - connect_tcp.started host='api.notion.com' port=443 local_address=None timeout=60.0 socket_options=None
+2025-12-25 01:40:26,284 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10c9c0ad0>
+2025-12-25 01:40:26,285 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x10767e8d0> server_hostname='api.notion.com' timeout=60.0
+2025-12-25 01:40:26,301 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10c971950>
+2025-12-25 01:40:26,303 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-12-25 01:40:26,305 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-12-25 01:40:26,306 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-12-25 01:40:26,308 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-12-25 01:40:26,308 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-12-25 01:40:26,550 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Wed, 24 Dec 2025 17:40:26 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'172'), (b'Connection', b'keep-alive'), (b'Server', b'cloudflare'), (b'CF-Ray', b'9b31e2407c01b016-TPE'), (b'CF-Cache-Status', b'DYNAMIC'), (b'ETag', b'W/"ac-ebvsuvWpNexsTbf/6UbiyazYDHY"'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Vary', b'Accept-Encoding'), (b'content-security-policy', b"default-src 'none'"), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'x-content-type-options', b'nosniff'), (b'x-dns-prefetch-control', b'off'), (b'x-download-options', b'noopen'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-notion-request-id', b'd33c9a3a-595f-4d5c-9aed-a331c6753c74'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-xss-protection', b'0'), (b'Set-Cookie', b'__cf_bm=kL5etQ.KF2xtGflPtNhnoeyGFac_meKPNFSNuRx981g-1766598026-1.0.1.1-QIRwMkaO_W3yWGi.JMEtBMP_8FQhm0VaCkxeVbWOPMdVlEERqOEipOL76pHfDdrQtX6EVNlNHnVfTPVVhfnCKfD3UxvAbI5XyyZn43_qDTI; path=/; expires=Wed, 24-Dec-25 18:10:26 GMT; domain=.notion.com; HttpOnly; Secure; SameSite=None'), (b'Set-Cookie', b'_cfuvid=ibUFTfpuYMJGZyBXZ6EC_vwJW8Ly.vGkbTGSwhM5WhE-1766598026548-0.0.1.1-604800000; path=/; domain=.notion.com; HttpOnly; Secure; SameSite=None'), (b'alt-svc', b'h3=":443"; ma=86400')])
+2025-12-25 01:40:26,556 - httpx - INFO - HTTP Request: POST https://api.notion.com/v1/databases/2d3a49006a17803da471f10e6ed697f0/query "HTTP/1.1 400 Bad Request"
+2025-12-25 01:40:26,557 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-12-25 01:40:26,558 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-12-25 01:40:26,559 - httpcore.http11 - DEBUG - response_closed.started
+2025-12-25 01:40:26,560 - httpcore.http11 - DEBUG - response_closed.complete
+2025-12-25 01:40:26,568 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:40:26] "GET / HTTP/1.1" 200 -
+2025-12-25 01:41:41,608 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:41:41,610 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:41:41,611 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:41:41,612 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:41:41,613 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:41:41,614 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:41:41,615 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:41:41,616 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:41:41,617 - intergrations.notion.logging - INFO - 🚀 日誌系統已初始化完成
+2025-12-25 01:41:41,618 - intergrations.notion.logging - INFO - 📁 日誌資料夾: /Users/limchinkun/Desktop/Project Synapse/logs
+2025-12-25 01:41:41,618 - intergrations.notion.logging - INFO - 📄 日誌檔案: app.log
+2025-12-25 01:41:41,619 - intergrations.notion.logging - INFO - 📊 日誌等級: DEBUG
+2025-12-25 01:41:41,620 - intergrations.notion.logging - INFO - 🔤 檔案編碼: utf-8
+2025-12-25 01:41:41,620 - intergrations.notion.logging - INFO - ============================================================
+2025-12-25 01:41:41,668 - intergrations.notion.client - INFO - ✅ Notion API 客戶端初始化完成
+2025-12-25 01:41:41,669 - intergrations.notion.client - DEBUG -    基礎 URL: https://api.notion.com/v1
+2025-12-25 01:41:41,670 - intergrations.notion.client - DEBUG -    API 版本: 2022-06-28
+2025-12-25 01:41:41,670 - intergrations.notion.processor - DEBUG - ✅ Notion 處理器已初始化完成
+2025-12-25 01:41:41,704 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://134.208.32.34:5001
+2025-12-25 01:41:41,706 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-25 01:42:20,142 - httpcore.connection - DEBUG - connect_tcp.started host='api.notion.com' port=443 local_address=None timeout=60.0 socket_options=None
+2025-12-25 01:42:20,155 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1109c0ad0>
+2025-12-25 01:42:20,157 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x10b6c28d0> server_hostname='api.notion.com' timeout=60.0
+2025-12-25 01:42:20,173 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x110971590>
+2025-12-25 01:42:20,175 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-12-25 01:42:20,176 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-12-25 01:42:20,178 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-12-25 01:42:20,179 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-12-25 01:42:20,180 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-12-25 01:42:23,161 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 400, b'Bad Request', [(b'Date', b'Wed, 24 Dec 2025 17:42:23 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'169'), (b'Connection', b'keep-alive'), (b'Server', b'cloudflare'), (b'CF-Ray', b'9b31e5082eb8b856-TPE'), (b'CF-Cache-Status', b'DYNAMIC'), (b'ETag', b'W/"a9-Lis1guMGqg9gKkYNxwKO1t+JV2g"'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Vary', b'Accept-Encoding'), (b'content-security-policy', b"default-src 'none'"), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'x-content-type-options', b'nosniff'), (b'x-dns-prefetch-control', b'off'), (b'x-download-options', b'noopen'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-notion-request-id', b'2f955771-e700-441f-84b3-f59de635774d'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-xss-protection', b'0'), (b'Set-Cookie', b'__cf_bm=tqypqVXe6j.uq7BEJf0bmQ_dd_IrXnMWogHon9CU_gI-1766598143-1.0.1.1-ocRTIgAgFBhFus3tjwpwZIL2itMqJZSK_F17HSI.uNh10F5prIOwli5Sp2VVgaw5bDfNfpfGZajU9kgoMZluOVDpYmcpNV_8YMlllp1NtrA; path=/; expires=Wed, 24-Dec-25 18:12:23 GMT; domain=.notion.com; HttpOnly; Secure; SameSite=None'), (b'Set-Cookie', b'_cfuvid=t7p_3je4wLADu0fGG2JsTwRu3mfkScoi3S8s0ar.Jpw-1766598143159-0.0.1.1-604800000; path=/; domain=.notion.com; HttpOnly; Secure; SameSite=None'), (b'alt-svc', b'h3=":443"; ma=86400')])
+2025-12-25 01:42:23,172 - httpx - INFO - HTTP Request: POST https://api.notion.com/v1/databases/2d3a49006a17803da471f10e6ed697f0/query "HTTP/1.1 400 Bad Request"
+2025-12-25 01:42:23,174 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-12-25 01:42:23,175 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-12-25 01:42:23,176 - httpcore.http11 - DEBUG - response_closed.started
+2025-12-25 01:42:23,176 - httpcore.http11 - DEBUG - response_closed.complete
+2025-12-25 01:42:23,183 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:23] "GET / HTTP/1.1" 200 -
+2025-12-25 01:42:23,833 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:23] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-25 01:42:23,846 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:23] "[33mGET /apple-touch-icon-precomposed.png HTTP/1.1[0m" 404 -
+2025-12-25 01:42:23,911 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:23] "[33mGET /apple-touch-icon.png HTTP/1.1[0m" 404 -
+2025-12-25 01:42:23,970 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:23] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-25 01:42:26,249 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:26] "GET /notion HTTP/1.1" 200 -
+2025-12-25 01:42:37,053 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): calendar.google.com:443
+2025-12-25 01:42:37,778 - urllib3.connectionpool - DEBUG - https://calendar.google.com:443 "GET /calendar/ical/ndhuoaa%40gmail.com/public/basic.ics HTTP/1.1" 200 None
+2025-12-25 01:42:38,066 - utils.google_calendar_sync - INFO - 已更新学年 109 第 2 学期: 2021-02-01 至 2021-07-31
+2025-12-25 01:42:38,069 - utils.google_calendar_sync - INFO - 已更新学年 109 第 1 学期: 2020-08-01 至 2021-01-31
+2025-12-25 01:42:38,071 - utils.google_calendar_sync - INFO - 已更新学年 108 第 1 学期: 2019-08-01 至 2020-01-31
+2025-12-25 01:42:38,074 - utils.google_calendar_sync - INFO - 已更新学年 108 第 2 学期: 2020-02-01 至 2020-07-31
+2025-12-25 01:42:38,076 - utils.google_calendar_sync - INFO - 已更新学年 110 第 2 学期: 2022-02-01 至 2022-07-31
+2025-12-25 01:42:38,079 - utils.google_calendar_sync - INFO - 已更新学年 110 第 1 学期: 2021-08-01 至 2022-01-31
+2025-12-25 01:42:38,081 - utils.google_calendar_sync - INFO - 已更新学年 114 第 1 学期: 2025-08-01 至 2026-01-31
+2025-12-25 01:42:38,084 - utils.google_calendar_sync - INFO - 已更新学年 113 第 1 学期: 2024-08-01 至 2025-01-31
+2025-12-25 01:42:38,087 - utils.google_calendar_sync - INFO - 已更新学年 114 第 2 学期: 2026-02-01 至 2026-07-31
+2025-12-25 01:42:38,090 - utils.google_calendar_sync - INFO - 已更新学年 111 第 1 学期: 2022-08-01 至 2023-01-31
+2025-12-25 01:42:38,092 - utils.google_calendar_sync - INFO - 已更新学年 111 第 2 学期: 2023-02-01 至 2023-07-31
+2025-12-25 01:42:38,094 - utils.google_calendar_sync - INFO - 已更新学年 112 第 2 学期: 2024-02-01 至 2024-07-31
+2025-12-25 01:42:38,097 - utils.google_calendar_sync - INFO - 已更新学年 113 第 2 学期: 2025-02-01 至 2025-07-31
+2025-12-25 01:42:38,099 - utils.google_calendar_sync - INFO - 已更新学年 112 第 1 学期: 2023-08-01 至 2024-01-31
+2025-12-25 01:42:38,101 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:38] "POST /api/notion/action HTTP/1.1" 200 -
+2025-12-25 01:42:39,480 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:39] "POST /api/notion/action HTTP/1.1" 200 -
+2025-12-25 01:42:43,736 - werkzeug - INFO - 127.0.0.1 - - [25/Dec/2025 01:42:43] "GET /api/notion/env/all HTTP/1.1" 200 -

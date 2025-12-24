@@ -40,10 +40,10 @@ def fetch_tasks_from_notion():
     if not notion or not database_id:
         return []
     try:
+        # 不使用排序，避免欄位不存在的錯誤
         response = notion.databases.query(
             database_id=database_id,
-            filter={"property": "Status", "status": {"does_not_equal": "Done"}},
-            sorts=[{"property": "Date", "direction": "ascending"}]
+            filter={"property": "Status", "status": {"does_not_equal": "Done"}}
         )
         for page in response["results"]:
             props = page["properties"]
