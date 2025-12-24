@@ -1,17 +1,34 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Synapse Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .card { border-radius: 12px; border: none; }
-        .card-header { border-radius: 12px 12px 0 0 !important; font-weight: bold; }
-        .btn { border-radius: 8px; }
-        .status-badge { font-size: 0.9em; padding: 6px 12px; border-radius: 20px; }
+        .card {
+            border-radius: 12px;
+            border: none;
+        }
+
+        .card-header {
+            border-radius: 12px 12px 0 0 !important;
+            font-weight: bold;
+        }
+
+        .btn {
+            border-radius: 8px;
+        }
+
+        .status-badge {
+            font-size: 0.9em;
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
     </style>
 </head>
+
 <body class="bg-light">
     <div class="container py-5">
         <header class="text-center mb-5">
@@ -39,7 +56,8 @@
                                 <td class="fw-bold">{{ task.task }}</td>
                                 <td>{{ task.deadline }}</td>
                                 <td>
-                                    <span class="badge status-badge bg-{{ 'success' if task.status == 'Done' else 'warning' }}">
+                                    <span
+                                        class="badge status-badge bg-{{ 'success' if task.status == 'Done' else 'warning' }}">
                                         {{ task.status }}
                                     </span>
                                 </td>
@@ -74,80 +92,136 @@
                 </div>
             </div>
 
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-primary h-100">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">👨‍🎓 學生專區 (Student)</h5>
+            <div class="col-md-4 text-end">
+                <a href="/notion" class="btn btn-outline-dark btn-lg w-100 py-3">
+                    ⚙️ Notion 系統管理
+                </a>
+            </div>
+            <div class="card shadow-sm border-danger mb-4">
+                <div class="col-12 mb-4">
+                    <div class="card shadow-sm border-danger">
+                        <div class="card-header bg-danger text-white">⚙️ 系統初始化與配置</div>
+                        <div class="card-body">
+                            <p class="text-muted">第一次使用或需要重建 Notion 環境時，請點擊下方按鈕。這將會讀取
+                                <code>config/notion_schema.json</code> 並自動建立資料庫。</p>
+                            <button onclick="initNotion()" class="btn btn-danger" id="initBtn">🚀 一鍵初始化 Notion
+                                環境</button>
+                            <div id="setup-status" class="mt-2 fw-bold"></div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p class="text-muted small mb-3">選擇任務並上傳您的作業檔案至系統。</p>
-                        
-                        <form action="/student/submit" method="POST" enctype="multipart/form-data">
-                            
-                            <div class="mb-3">
-                                <label class="form-label">您的姓名</label>
-                                <input type="text" name="student_name" class="form-control" placeholder="請輸入姓名" required>
-                            </div>
+                </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">選擇任務</label>
-                                <select name="task_name" class="form-select" required>
-                                    <option value="" disabled selected>-- 請選擇要繳交的作業 --</option>
-                                    {% for task in tasks %}
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-primary h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">👨‍🎓 學生專區 (Student)</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">選擇任務並上傳您的作業檔案至系統。</p>
+
+                            <form action="/student/submit" method="POST" enctype="multipart/form-data">
+
+                                <div class="mb-3">
+                                    <label class="form-label">您的姓名</label>
+                                    <input type="text" name="student_name" class="form-control" placeholder="請輸入姓名"
+                                        required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">選擇任務</label>
+                                    <select name="task_name" class="form-select" required>
+                                        <option value="" disabled selected>-- 請選擇要繳交的作業 --</option>
+                                        {% for task in tasks %}
                                         {% if task.status != 'Done' %}
-                                        <option value="{{ task.task }}">{{ task.task }} (截止: {{ task.deadline }})</option>
+                                        <option value="{{ task.task }}">{{ task.task }} (截止: {{ task.deadline }})
+                                        </option>
                                         {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
+                                        {% endfor %}
+                                    </select>
+                                </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">作業檔案</label>
-                                <input type="file" name="homework_file" class="form-control" required>
-                            </div>
+                                <div class="mb-3">
+                                    <label class="form-label">作業檔案</label>
+                                    <input type="file" name="homework_file" class="form-control" required>
+                                </div>
 
-                            <button type="submit" class="btn btn-primary w-100">
-                                📤 提交作業 (Upload)
-                            </button>
-                        </form>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    📤 提交作業 (Upload)
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="row">
-            <div class="col-12 mb-4">
-                <div class="card shadow-sm border-dark">
-                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">🛠️ 學術生產力工具 (Academic Tools)</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <h5 class="card-title fw-bold">📄 論文編譯工廠 (PDF Factory)</h5>
-                                <p class="card-text text-muted mb-0">
-                                    專為學術寫作設計。上傳 Markdown 檔案與圖片，系統將自動排版並生成符合 
-                                    <strong>中華心理學刊 (CJP)</strong> 或 <strong>APA 7th</strong> 格式的 PDF 論文。
-                                    <br><small class="text-secondary">* 支援 LaTeX 數學公式、自動圖表編號與文獻引用。</small>
-                                </p>
-                            </div>
-                            <div class="col-md-4 text-end mt-3 mt-md-0">
-                                <a href="/thesis" class="btn btn-dark btn-lg w-100 py-3">
-                                    🚀 進入編譯工廠
-                                </a>
+            <div class="row">
+                <div class="col-12 mb-4">
+                    <div class="card shadow-sm border-dark">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">🛠️ 學術生產力工具 (Academic Tools)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="card-title fw-bold">📄 論文編譯工廠 (PDF Factory)</h5>
+                                    <p class="card-text text-muted mb-0">
+                                        專為學術寫作設計。上傳 Markdown 檔案與圖片，系統將自動排版並生成符合
+                                        <strong>中華心理學刊 (CJP)</strong> 或 <strong>APA 7th</strong> 格式的 PDF 論文。
+                                        <br><small class="text-secondary">* 支援 LaTeX 數學公式、自動圖表編號與文獻引用。</small>
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end mt-3 mt-md-0">
+                                    <a href="/thesis" class="btn btn-dark btn-lg w-100 py-3">
+                                        🚀 進入編譯工廠
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
 
-    </div>
+        <footer class="text-center text-muted py-4 small">
+            &copy; 2025 Project Synapse. Powered by Flask, Notion API, Docker & N8N.
+        </footer>
 
-    <footer class="text-center text-muted py-4 small">
-        &copy; 2025 Project Synapse. Powered by Flask, Notion API, Docker & N8N.
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
+<script>
+    function initNotion() {
+        if (!confirm("這將會在您的 Notion 頁面建立新資料庫，確定嗎？")) return;
+
+        const btn = document.getElementById('initBtn');
+        const status = document.getElementById('setup-status');
+
+        btn.disabled = true;
+        status.className = "mt-2 text-primary";
+        status.innerText = "⏳ 正在執行初始化，這可能需要一分鐘，請勿關閉網頁...";
+
+        fetch('/api/notion/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    status.className = "mt-2 text-success";
+                    status.innerText = "✅ " + data.message;
+                    alert(data.message + " 頁面即將重新整理。");
+                    location.reload();
+                } else {
+                    throw new Error(data.message);
+                }
+            })
+            .catch(error => {
+                status.className = "mt-2 text-danger";
+                status.innerText = "❌ 失敗: " + error.message;
+                btn.disabled = false;
+            });
+    }
+</script>
+
 </html>

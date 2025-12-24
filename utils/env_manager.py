@@ -4,7 +4,22 @@ import logging
 import configparser
 from dotenv import load_dotenv, set_key, find_dotenv
 
-# import modules
+def set_env(key, value):
+    """將環境變數寫入 .env 檔案並更新當前執行環境"""
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        # 如果找不到 .env，則在當前目錄建立一個
+        dotenv_path = '.env'
+        with open(dotenv_path, 'a'): pass
+    
+    # 寫入 .env 檔案
+    success = set_key(dotenv_path, key, value)
+    
+    if success:
+        # 同時更新當前進程的 os.environ，讓程式不用重啟也能讀到
+        os.environ[key] = value
+        return True
+    return False
 
 logger = logging.getLogger(__name__)
 

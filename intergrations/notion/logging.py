@@ -1,37 +1,50 @@
-# import libraries
+"""
+Notion 整合模組 - 日誌系統
+配置和管理日誌記錄
+"""
 import logging
 from pathlib import Path
 from rich.logging import RichHandler
 
-# import modules
-from .config import config
+from .config import notion_config
+
 
 def setup_logging():
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent
-    # print(PROJECT_ROOT)
-
-    log_folder = config.get_config("log_folder", section="Logging", default="logs")
-    log_filename = config.get_config("log_filename", section="Logging", default="app.log")
-    log_level = config.get_config("log_level", section="Logging", default="INFO").upper()
-    log_format = config.get_config("log_format", section="Logging", default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    log_encoding = config.get_config("log_encoding", section="Logging", default="utf-8")
-
-    log_dir = PROJECT_ROOT / log_folder
-    log_dir.mkdir(exist_ok=True)
-    log_file = log_dir / log_filename
-
+    """
+    配置日誌系統
+    
+    設置文件日誌和控制台日誌（使用 Rich 格式化）
+    """
+    # 獲取配置
+    log_dir = notion_config.log_folder
+    log_file = log_dir / notion_config.log_filename
+    log_level = notion_config.log_level
+    log_format = notion_config.log_format
+    log_encoding = notion_config.log_encoding
+    
+    # 創建日誌目錄
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 配置日誌
     logging.basicConfig(
-        level=log_level,
+        level=getattr(logging, log_level, logging.INFO),
         format=log_format,
         handlers=[
             logging.FileHandler(log_file, mode="a", encoding=log_encoding),
-            RichHandler(rich_tracebacks=True)
+            RichHandler(rich_tracebacks=True, markup=True)
         ]
     )
-    # logger = logging.getLogger(__name__)
-    # logger.info(f"Logging configured...")
-    # logger.info(f"log_folder   : {log_folder}")
-    # logger.info(f"log_filename : {log_filename}")
-    # logger.info(f"log_level    : {log_level}")
-    # logger.info(f"log_format   : {log_format}")
-    # logger.info(f"log_encoding : {log_encoding}")
+    
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 60)
+    logger.info("日誌系統已初始化")
+    logger.info(f"日誌目錄: {log_dir}")
+    logger.info(f"日誌文件: {log_file.name}")
+    logger.info(f"日誌級別: {log_level}")
+    logger.info("=" * 60)
+    
+    return logger
+
+
+# 自動配置日誌（當模組被導入時）
+_logger = setup_logging()
