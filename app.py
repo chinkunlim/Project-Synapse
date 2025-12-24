@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import os
 import requests
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
+from pathlib import Path
 from notion_client import Client
 
 # 導入重構後的 Notion 模組
@@ -10,12 +11,14 @@ from intergrations.notion import (
     NotionProcessor,
     setup_logging
 )
+from utils.google_calendar_sync import GoogleCalendarIntegration
 
 # 初始化日誌系統
 setup_logging()
 
 # 載入環境變數
 load_dotenv()
+ENV_PATH = Path('.env').resolve()
 
 # 初始化 Flask 應用
 app = Flask(__name__)
@@ -213,6 +216,21 @@ def notion_management():
     }
 
     return render_template('notion_admin.html', status=config_status, **database_ids)
+
+
+def _get_env_values():
+    keys = [
+        "NOTION_API_KEY",
+        "PARENT_PAGE_ID",
+        "TASK_DATABASE_ID",
+        "COURSE_HUB_ID",
+        "PROJECT_DATABASE_ID",
+        "CLASS_SESSION_ID",
+        "NOTE_DATABASE_ID",
+        "RESOURCE_DATABASE_ID",
+        "CALENDAR_ICAL_URL",
+    ]
+    return {k: os.getenv(k, "") for k in keys}
 
 @app.route('/api/notion/action', methods=['POST'])
 def handle_notion_action():
@@ -425,6 +443,46 @@ def handle_notion_action():
                 "logs": logs
             })
 
+        # 同步學期日期（Google Calendar）
+        elif action == "sync_calendar":
+            calendar_url = os.getenv(
+                "CALENDAR_ICAL_URL",
+                "https://calendar.google.com/calendar/ical/ndhuoaa%40gmail.com/public/basic.ics"
+            )
+
+            semesters = GoogleCalendarIntegration.extract_semester_from_ical_url(calendar_url)
+            if not semesters:
+                return jsonify({
+                    "status": "error",
+                    "message": "❌ 無法從 Google Calendar 取得學期資訊，請確認 iCal URL 是否公開"
+                }), 500
+
+            valid_semesters = GoogleCalendarIntegration.validate_semester_data(semesters)
+            if not valid_semesters:
+                return jsonify({
+                    "status": "error",
+                    "message": "❌ 未找到有效的開始/結束日期配對"
+                }), 500
+
+            GoogleCalendarIntegration.apply_semesters_to_config(valid_semesters)
+
+            logs = []
+            for (year, sem), dates in sorted(valid_semesters.items()):
+                logs.append(f"學年 {year} 第 {sem} 學期: {dates['start'].date()} ~ {dates['end'].date()}")
+
+            return jsonify({
+                "status": "success",
+                "message": "✅ 學期日期已同步（Google Calendar）",
+                "logs": logs
+            })
+
+        # 取得環境變數（可編輯）
+        elif action == "get_env":
+            return jsonify({
+                "status": "success",
+                "data": _get_env_values()
+            })
+
         else:
             return jsonify({
                 "status": "error",
@@ -458,6 +516,7 @@ def upload_csv_to_notion():
         
         csv_file = request.files['csv_file']
         database_id = request.form.get('database_id')
+        database_type = request.form.get('database_type', '')
         
         if not database_id:
             return jsonify({
@@ -479,8 +538,19 @@ def upload_csv_to_notion():
             csv_file.seek(0)
             csv_content = csv_file.read().decode('big5')
         
+        # 為課程導入準備額外參數
+        extra_params = {}
+        if database_type == 'courses':
+            semester_start = request.form.get('semester_start')
+            semester_end = request.form.get('semester_end')
+            
+            if semester_start and semester_end:
+                extra_params['semester_start'] = semester_start
+                extra_params['semester_end'] = semester_end
+                extra_params['course_sessions_db_id'] = os.getenv("CLASS_SESSION_ID", "")
+        
         # 導入到 Notion
-        result = notion_processor.import_csv_to_database(database_id, csv_content)
+        result = notion_processor.import_csv_to_database(database_id, csv_content, extra_params)
         
         if result["success"]:
             return jsonify({
@@ -504,6 +574,50 @@ def upload_csv_to_notion():
         return jsonify({
             "status": "error",
             "message": f"❌ CSV 上傳失敗: {str(e)}",
+            "error": traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/notion/env/all', methods=['GET'])
+def list_env_vars():
+    """取得 Notion 相關環境變數（可編輯）"""
+    try:
+        return jsonify({
+            "status": "success",
+            "data": _get_env_values()
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 讀取環境變數失敗: {str(e)}"
+        }), 500
+
+
+@app.route('/api/notion/env/update', methods=['POST'])
+def update_env_vars():
+    """更新 Notion 相關環境變數，並寫回 .env"""
+    try:
+        payload = request.json or {}
+        current = _get_env_values()
+
+        # 只允許白名單中的 key
+        for key in current.keys():
+            if key in payload:
+                value = payload[key] if payload[key] is not None else ""
+                os.environ[key] = value
+                # 持久化到 .env
+                set_key(str(ENV_PATH), key, value)
+
+        return jsonify({
+            "status": "success",
+            "message": "✅ 環境變數已更新並寫入 .env",
+            "data": _get_env_values()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 更新失敗: {str(e)}",
             "error": traceback.format_exc()
         }), 500
 
@@ -533,5 +647,5 @@ def download_csv_sample(database_type):
         }), 500
 
 if __name__ == '__main__':
-    # 使用非調試模式並改用 5100 端口，避免與 pdf_service 衝突
-    app.run(host='0.0.0.0', port=5100, debug=False)
+    # 使用非調試模式並改用 5001 端口，避免與 pdf_service 衝突
+    app.run(host='0.0.0.0', port=5001)

@@ -293,7 +293,8 @@ class NotionProcessor:
     def import_csv_to_database(
         self, 
         database_id: str, 
-        csv_content: str
+        csv_content: str,
+        extra_params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         從 CSV 內容導入數據到 Notion 數據庫
@@ -301,6 +302,7 @@ class NotionProcessor:
         Args:
             database_id: 目標數據庫 ID
             csv_content: CSV 文件內容
+            extra_params: 額外參數，例如課程導入時的學期日期
             
         Returns:
             導入結果字典，包含成功和失敗的記錄
@@ -319,12 +321,15 @@ class NotionProcessor:
                     "failed": 0
                 }
             
+            extra_params = extra_params or {}
+            
             logger.info(f"開始導入 {len(rows)} 筆記錄...")
             console.print(f"[cyan]📥 開始導入 {len(rows)} 筆記錄...[/cyan]")
             
             imported = 0
             failed = 0
             errors = []
+            created_courses = []  # 用於記錄創建的課程
             
             for row_num, row in enumerate(tqdm(rows, desc="導入數據"), 1):
                 try:
@@ -341,6 +346,16 @@ class NotionProcessor:
                     
                     if response and response.status_code == 200:
                         imported += 1
+                        page_id = response.json().get("id")
+                        
+                        # 如果是課程導入，記錄課程信息用於生成會話
+                        if extra_params.get('semester_start') and page_id:
+                            course_name = row.get('Name', f'Course {row_num}')
+                            created_courses.append({
+                                'id': page_id,
+                                'name': course_name,
+                                'row_data': row
+                            })
                     else:
                         failed += 1
                         errors.append(f"第 {row_num} 行導入失敗")
@@ -351,12 +366,27 @@ class NotionProcessor:
                     errors.append(error_msg)
                     logger.error(error_msg)
             
+            # 如果是課程導入，自動生成課程會話
+            sessions_created = 0
+            if created_courses and extra_params.get('semester_start'):
+                sessions_created = self._generate_course_sessions(
+                    created_courses,
+                    extra_params.get('semester_start'),
+                    extra_params.get('semester_end'),
+                    extra_params.get('course_sessions_db_id')
+                )
+            
             # 返回結果
+            message = f"導入完成：成功 {imported} 筆，失敗 {failed} 筆"
+            if sessions_created > 0:
+                message += f"；已生成 {sessions_created} 堂課程會話"
+            
             result = {
                 "success": imported > 0,
-                "message": f"導入完成：成功 {imported} 筆，失敗 {failed} 筆",
+                "message": message,
                 "imported": imported,
                 "failed": failed,
+                "sessions_created": sessions_created,
                 "errors": errors[:10] if errors else []  # 只返回前 10 個錯誤
             }
             
@@ -448,6 +478,101 @@ class NotionProcessor:
         
         return properties
     
+    def _generate_course_sessions(
+        self,
+        created_courses: List[Dict[str, Any]],
+        semester_start: str,
+        semester_end: str,
+        sessions_db_id: str
+    ) -> int:
+        """
+        為每門課程自動生成 18 堂課程會話
+        
+        Args:
+            created_courses: 已創建的課程列表，包含 id 和 name
+            semester_start: 學期開始日期 (YYYY-MM-DD)
+            semester_end: 學期結束日期 (YYYY-MM-DD)
+            sessions_db_id: 課程會話數據庫 ID
+            
+        Returns:
+            生成的課程會話總數
+        """
+        from datetime import datetime, timedelta
+        
+        if not sessions_db_id:
+            logger.warning("課程會話數據庫 ID 未設置，跳過會話生成")
+            return 0
+        
+        try:
+            start_date = datetime.strptime(semester_start, "%Y-%m-%d")
+            end_date = datetime.strptime(semester_end, "%Y-%m-%d")
+            
+            total_sessions_created = 0
+            
+            # 計算每周間隔
+            semester_weeks = (end_date - start_date).days / 7
+            weeks_per_session = max(1, int(semester_weeks / 18))  # 18 堂課
+            
+            logger.info(f"開始為 {len(created_courses)} 門課程生成課程會話...")
+            console.print(f"[cyan]📚 為 {len(created_courses)} 門課程生成 18 堂會話[/cyan]")
+            
+            for course in created_courses:
+                course_name = course.get('name', 'Unknown Course')
+                course_id = course.get('id')
+                
+                logger.info(f"為課程 '{course_name}' 生成會話...")
+                
+                # 生成 18 堂課
+                for session_num in range(1, 19):
+                    session_date = start_date + timedelta(weeks=(session_num - 1) * weeks_per_session)
+                    
+                    # 確保會話日期不超過學期結束日期
+                    if session_date > end_date:
+                        session_date = end_date
+                    
+                    try:
+                        # 構建課程會話屬性
+                        session_properties = {
+                            "Name": {
+                                "title": [{"type": "text", "text": {"content": f"{course_name} - 第 {session_num} 週"}}]
+                            },
+                            "Date": {
+                                "date": {"start": session_date.strftime("%Y-%m-%d")}
+                            },
+                            "Course": {
+                                "relation": [{"id": course_id}]
+                            }
+                        }
+                        
+                        # 創建課程會話頁面
+                        payload = {
+                            "parent": {"database_id": sessions_db_id},
+                            "properties": session_properties
+                        }
+                        
+                        response = self.client._send_request("POST", "pages", payload)
+                        
+                        if response and response.status_code == 200:
+                            total_sessions_created += 1
+                        else:
+                            logger.warning(f"無法為 '{course_name}' 創建第 {session_num} 周的會話")
+                    
+                    except Exception as e:
+                        logger.error(f"創建課程會話失敗: {str(e)}")
+            
+            logger.info(f"✅ 成功生成 {total_sessions_created} 堂課程會話")
+            console.print(f"[green]✅ 成功生成 {total_sessions_created} 堂課程會話[/green]")
+            
+            return total_sessions_created
+            
+        except ValueError as e:
+            logger.error(f"日期格式錯誤: {str(e)}")
+            console.print(f"[red]❌ 日期格式錯誤: {str(e)}[/red]")
+            return 0
+        except Exception as e:
+            logger.error(f"生成課程會話失敗: {str(e)}", exc_info=True)
+            console.print(f"[red]❌ 生成課程會話失敗: {str(e)}[/red]")
+            return 0
     @staticmethod
     def generate_csv_sample(database_type: str = "tasks") -> str:
         """

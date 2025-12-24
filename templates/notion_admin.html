@@ -2,10 +2,27 @@
 <html lang="zh-TW">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notion 管理中樞 | Project Synapse</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --dark-bg: #1e1e1e;
+            --text-light: #d4d4d4;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
         .loading-overlay {
             display: none;
             position: fixed;
@@ -18,40 +35,211 @@
             justify-content: center;
             align-items: center;
         }
+
         .loading-overlay.show {
             display: flex;
         }
+
         .spinner-container {
             text-align: center;
             color: white;
         }
+
         .log-output {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 15px;
-            border-radius: 5px;
+            background: var(--dark-bg);
+            color: var(--text-light);
+            padding: 20px;
+            border-radius: 8px;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
-            max-height: 400px;
+            font-size: 13px;
+            max-height: 500px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
+            border-left: 4px solid var(--primary-color);
+            line-height: 1.6;
         }
-        .log-output .success { color: #4ec9b0; }
-        .log-output .error { color: #f48771; }
-        .log-output .warning { color: #dcdcaa; }
+
+        .log-output div {
+            margin-bottom: 8px;
+        }
+
+        .log-output .success { color: #4ec9b0; font-weight: 500; }
+        .log-output .error { color: #f48771; font-weight: 500; }
+        .log-output .warning { color: #dcdcaa; font-weight: 500; }
         .log-output .info { color: #9cdcfe; }
+
         .action-card {
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.1);
+            height: 100%;
         }
+
         .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            font-weight: 600;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .card-header h5 {
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header i {
+            font-size: 1.2em;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .btn {
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn i {
+            margin-right: 6px;
+        }
+
+        .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .danger-zone {
+            border-left: 4px solid var(--danger-color);
+            background: rgba(220, 53, 69, 0.05);
+        }
+
+        .danger-zone .card-header {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c82333 100%);
+        }
+
+        .danger-warning {
+            background: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid var(--danger-color);
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--primary-color);
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-item i {
+            font-size: 1.8em;
+            color: var(--primary-color);
+        }
+
+        .status-content {
+            flex: 1;
+        }
+
+        .status-content strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .log-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-scroll::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .log-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+        }
+
+        .log-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                margin-bottom: 20px;
+            }
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .header-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .header-section h2 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-section p {
+            color: #666;
+            margin: 0;
         }
     </style>
 </head>
 
-<body class="bg-light">
+<body>
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner-container">
@@ -62,238 +250,275 @@
         </div>
     </div>
 
-    <div class="container py-4">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2><i class="bi bi-gear-fill"></i> Notion 系統管理中樞</h2>
-                <p class="text-muted mb-0">集中管理所有 Notion 相關操作</p>
-            </div>
-            <a href="/" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> 返回儀表板
-            </a>
-        </div>
-
-        <!-- System Status -->
-        <div class="row g-4 mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-info-circle-fill"></i> 系統狀態</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-key-fill me-2"></i>
-                                    <strong>API Key:</strong>
-                                    <span class="ms-2 badge {{ 'bg-success' if '已設定' in status.api_key else 'bg-danger' }}">
-                                        {{ status.api_key }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-file-earmark-text me-2"></i>
-                                    <strong>Parent Page:</strong>
-                                    <span class="ms-2 badge {{ 'bg-success' if '已設定' in status.parent_id else 'bg-danger' }}">
-                                        {{ status.parent_id }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-database me-2"></i>
-                                    <strong>Task Database:</strong>
-                                    <span class="ms-2 badge {{ 'bg-success' if '已設定' in status.task_db else 'bg-warning' }}">
-                                        {{ status.task_db }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <hr>
-                        <button onclick="runAction('test_connection')" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-wifi"></i> 測試連接
-                        </button>
-                    </div>
+    <div class="container-xl py-4">
+        <div class="main-container">
+            <!-- Header -->
+            <div class="header-section d-flex justify-content-between align-items-start">
+                <div>
+                    <h2><i class="bi bi-gear-fill"></i> Notion 系統管理中樞</h2>
+                    <p class="mb-0">集中管理所有 Notion 相關操作和配置</p>
                 </div>
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回儀表板
+                </a>
             </div>
-        </div>
 
-        <!-- Operations Grid -->
-        <div class="row g-4 mb-4">
-            <!-- Basic Operations -->
-            <div class="col-md-6">
-                <div class="card shadow-sm action-card h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="bi bi-play-circle-fill"></i> 基本操作</h5>
+            <!-- System Status -->
+            <div class="mb-4">
+                <h3 class="section-title"><i class="bi bi-info-circle-fill"></i> 系統狀態</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <i class="bi bi-key-fill"></i>
+                        <div class="status-content">
+                            <strong>API Key</strong>
+                            <span class="status-badge {{ 'badge-success' if '已設定' in status.api_key else 'badge-danger' }}">
+                                {{ status.api_key }}
+                            </span>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <button onclick="runAction('test_connection')" class="btn btn-outline-success">
-                                <i class="bi bi-wifi"></i> 測試 Notion 連接
-                            </button>
-                            <button onclick="runAction('build_layout')" class="btn btn-outline-primary">
-                                <i class="bi bi-layout-text-window-reverse"></i> 構建儀表板佈局
-                            </button>
-                            <button onclick="runAction('create_databases')" class="btn btn-outline-info">
-                                <i class="bi bi-database-add"></i> 創建數據庫
-                            </button>
+                    <div class="status-item">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <div class="status-content">
+                            <strong>Parent Page</strong>
+                            <span class="status-badge {{ 'badge-success' if '已設定' in status.parent_id else 'badge-danger' }}">
+                                {{ status.parent_id }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <i class="bi bi-database"></i>
+                        <div class="status-content">
+                            <strong>Task Database</strong>
+                            <span class="status-badge {{ 'badge-success' if '已設定' in status.task_db else 'badge-warning' }}">
+                                {{ status.task_db }}
+                            </span>
                         </div>
                     </div>
                 </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button onclick="runAction('test_connection')" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-wifi"></i> 測試連接
+                    </button>
+                    <button onclick="openEnvModal()" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil-square"></i> 編輯環境變數
+                    </button>
+                </div>
             </div>
 
-            <!-- Quick Setup -->
-            <div class="col-md-6">
-                <div class="card shadow-sm action-card h-100">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-rocket-takeoff-fill"></i> 快速設置</h5>
+            <!-- Operations Grid -->
+            <h3 class="section-title"><i class="bi bi-lightning-charge-fill"></i> 操作面板</h3>
+            <div class="row g-4 mb-5">
+                <!-- Basic Operations -->
+                <div class="col-lg-6">
+                    <div class="card shadow-sm action-card">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="bi bi-play-circle-fill"></i> 基本操作</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button onclick="runAction('test_connection')" class="btn btn-outline-success">
+                                    <i class="bi bi-wifi"></i> 測試 Notion 連接
+                                </button>
+                                <button onclick="runAction('build_layout')" class="btn btn-outline-primary">
+                                    <i class="bi bi-layout-text-window-reverse"></i> 構建儀表板佈局
+                                </button>
+                                <button onclick="runAction('create_databases')" class="btn btn-outline-info">
+                                    <i class="bi bi-database-add"></i> 創建數據庫
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p class="text-muted mb-3">
-                            <i class="bi bi-info-circle"></i> 一鍵完成所有初始化步驟
-                        </p>
-                        <div class="d-grid gap-2">
-                            <button onclick="runAction('init_all')" class="btn btn-primary btn-lg">
-                                <i class="bi bi-rocket-takeoff"></i> 一鍵初始化所有資料庫
-                            </button>
-                            <small class="text-muted">
-                                包含: 測試連接 → 構建佈局 → 創建數據庫
+                </div>
+
+                <!-- Quick Setup -->
+                <div class="col-lg-6">
+                    <div class="card shadow-sm action-card">
+                        <div class="card-header bg-primary text-white">
+                            <h5><i class="bi bi-rocket-takeoff-fill"></i> 快速設置</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                <i class="bi bi-info-circle"></i> 一鍵完成所有初始化步驟
+                            </p>
+                            <div class="d-grid gap-2">
+                                <button onclick="runAction('init_all')" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-rocket-takeoff"></i> 一鍵初始化所有
+                                </button>
+                                <small class="text-muted text-center">
+                                    連接 → 佈局 → 數據庫
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Management -->
+                <div class="col-lg-6">
+                    <div class="card shadow-sm action-card">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="bi bi-database-fill"></i> 數據庫管理</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button onclick="runAction('list_databases')" class="btn btn-outline-info">
+                                    <i class="bi bi-list-ul"></i> 列出所有數據庫
+                                </button>
+                                <button onclick="runAction('check_schema')" class="btn btn-outline-secondary">
+                                    <i class="bi bi-file-code"></i> 檢查 Schema 配置
+                                </button>
+                                <button onclick="runAction('sync_calendar')" class="btn btn-outline-primary">
+                                    <i class="bi bi-calendar2-week"></i> 同步學期日期 (Google Calendar)
+                                </button>
+                                <button onclick="runAction('show_env')" class="btn btn-outline-secondary">
+                                    <i class="bi bi-gear"></i> 顯示環境變數
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSV Import/Export -->
+                <div class="col-lg-6">
+                    <div class="card shadow-sm action-card">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="bi bi-file-earmark-spreadsheet"></i> CSV 數據導入</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                <i class="bi bi-info-circle"></i> 上傳 CSV 文件批量導入數據
+                            </p>
+                            
+                            <!-- 數據庫選擇 -->
+                            <div class="mb-3">
+                                <label for="targetDatabase" class="form-label">選擇目標數據庫</label>
+                                <select id="targetDatabase" class="form-select form-select-sm">
+                                    <option value="">-- 請選擇數據庫 --</option>
+                                    <option value="tasks">任務</option>
+                                    <option value="courses">課程</option>
+                                    <option value="projects">專案</option>
+                                    <option value="sessions">課堂</option>
+                                    <option value="notes">筆記</option>
+                                    <option value="resources">資源</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 課程導入時的學期設置 -->
+                            <div id="semesterSettings" class="mb-3" style="display: none;">
+                                <div class="alert alert-info" role="alert">
+                                    <i class="bi bi-info-circle"></i> 導入課程時，請設置學期開始和結束日期
+                                </div>
+                                <div class="mb-2">
+                                    <label for="semesterStart" class="form-label">學期開始日期</label>
+                                    <input type="date" class="form-control form-control-sm" id="semesterStart">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="semesterEnd" class="form-label">學期結束日期</label>
+                                    <input type="date" class="form-control form-control-sm" id="semesterEnd">
+                                </div>
+                                <small class="text-muted">💡 將用於自動生成 18 堂課程會話</small>
+                            </div>
+                            
+                            <!-- CSV 上傳 -->
+                            <div class="mb-3">
+                                <label for="csvFile" class="form-label">選擇 CSV 文件</label>
+                                <input type="file" class="form-control form-control-sm" id="csvFile" accept=".csv">
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button onclick="uploadCSV()" class="btn btn-success btn-sm">
+                                    <i class="bi bi-upload"></i> 上傳並導入
+                                </button>
+                                <button onclick="downloadSample()" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-download"></i> 下載樣本
+                                </button>
+                            </div>
+                            
+                            <small class="text-muted d-block mt-2">
+                                💡 請先下載樣本查看格式
                             </small>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Database Management -->
-            <div class="col-md-6">
-                <div class="card shadow-sm action-card h-100">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="bi bi-database-fill"></i> 數據庫管理</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <button onclick="runAction('list_databases')" class="btn btn-outline-info">
-                                <i class="bi bi-list-ul"></i> 列出所有數據庫
-                            </button>
-                            <button onclick="runAction('check_schema')" class="btn btn-outline-secondary">
-                                <i class="bi bi-file-code"></i> 檢查 Schema 配置
-                            </button>
-                            <button onclick="runAction('show_env')" class="btn btn-outline-secondary">
-                                <i class="bi bi-gear"></i> 顯示環境變數
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- CSV Import/Export -->
-            <div class="col-md-6">
-                <div class="card shadow-sm action-card h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> CSV 數據導入</h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted mb-3">
-                            <i class="bi bi-info-circle"></i> 上傳 CSV 文件批量導入數據
-                        </p>
-                        
-                        <!-- 數據庫選擇 -->
-                        <div class="mb-3">
-                            <label for="targetDatabase" class="form-label">選擇目標數據庫</label>
-                            <select id="targetDatabase" class="form-select">
-                                <option value="">-- 請選擇數據庫 --</option>
-                                <option value="tasks">Tasks (任務)</option>
-                                <option value="courses">Courses (課程)</option>
-                                <option value="projects">Projects (專案)</option>
-                                <option value="sessions">Sessions (課堂)</option>
-                                <option value="notes">Notes (筆記)</option>
-                                <option value="resources">Resources (資源)</option>
-                            </select>
-                        </div>
-                        
-                        <!-- CSV 上傳 -->
-                        <div class="mb-3">
-                            <label for="csvFile" class="form-label">選擇 CSV 文件</label>
-                            <input type="file" class="form-control" id="csvFile" accept=".csv">
-                        </div>
-                        
-                        <div class="d-grid gap-2">
-                            <button onclick="uploadCSV()" class="btn btn-success">
-                                <i class="bi bi-upload"></i> 上傳並導入
-                            </button>
-                            <button onclick="downloadSample()" class="btn btn-outline-success">
-                                <i class="bi bi-download"></i> 下載 CSV 樣本
-                            </button>
-                        </div>
-                        
-                        <small class="text-muted d-block mt-2">
-                            * 請先下載樣本查看格式，再準備您的 CSV 文件
-                        </small>
-                    </div>
-                </div>
-            </div>
-
             <!-- Danger Zone -->
-            <div class="col-md-6">
-                                <i class="bi bi-file-code"></i> 檢查 Schema 配置
-                            </button>
-                            <button onclick="runAction('show_env')" class="btn btn-outline-secondary">
-                                <i class="bi bi-gear"></i> 顯示環境變數
-                            </button>
+            <h3 class="section-title"><i class="bi bi-exclamation-triangle-fill"></i> 危險區域</h3>
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card shadow-sm action-card danger-zone">
+                        <div class="card-header">
+                            <h5><i class="bi bi-exclamation-circle-fill"></i> 系統重置與清理</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="danger-warning">
+                                <strong><i class="bi bi-exclamation-diamond"></i> 危險警告</strong>
+                                <p class="mb-0 mt-2">以下操作會永久刪除數據，請在確認無誤後再執行！</p>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <button onclick="runAction('clean')" class="btn btn-outline-danger w-100">
+                                        <i class="bi bi-trash"></i> 清空頁面內容
+                                    </button>
+                                    <small class="text-muted d-block mt-2">清空 Notion 頁面中的所有內容</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <button onclick="runAction('reset_all')" class="btn btn-danger w-100">
+                                        <i class="bi bi-arrow-counterclockwise"></i> 重置所有設置
+                                    </button>
+                                    <small class="text-muted d-block mt-2">清空後重新初始化所有配置</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Danger Zone -->
-            <div class="col-md-6">
-                <div class="card shadow-sm action-card h-100 border-danger">
-                    <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> 危險區域</h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-danger mb-3">
-                            <strong><i class="bi bi-exclamation-circle"></i> 警告：</strong>
-                            以下操作會刪除數據，請謹慎使用！
-                        </p>
-                        <div class="d-grid gap-2">
-                            <button onclick="runAction('clean')" class="btn btn-outline-danger">
-                                <i class="bi bi-trash"></i> 清空頁面內容
-                            </button>
-                            <button onclick="runAction('reset_all')" class="btn btn-danger">
-                                <i class="bi bi-arrow-counterclockwise"></i> 重置所有設置
-                            </button>
-                        </div>
-                        <small class="text-muted d-block mt-2">
-                            * 重置操作會清空頁面並重新初始化
-                        </small>
-                    </div>
+            <!-- Log Output -->
+            <h3 class="section-title"><i class="bi bi-terminal"></i> 操作日誌</h3>
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-terminal-fill"></i> 實時操作日誌</h5>
+                    <button onclick="clearLog()" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-x-lg"></i> 清空日誌
+                    </button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Log Output -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-terminal"></i> 操作日誌</h5>
-                        <button onclick="clearLog()" class="btn btn-sm btn-outline-light">
-                            <i class="bi bi-x-circle"></i> 清空
-                        </button>
-                    </div>
-                    <div class="card-body p-0">
-                        <div id="logOutput" class="log-output">
-                            <span class="info">🎯 Notion 管理中樞已就緒</span>
-                            <span class="info">📝 請選擇上方的操作按鈕開始使用</span>
-                        </div>
+                <div class="card-body p-0">
+                    <div id="logOutput" class="log-output log-scroll">
+                        <div class="info">🎯 Notion 管理中樞已就緒</div>
+                        <div class="info">📝 請選擇上方的操作按鈕開始使用</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Env Modal -->
+    <div class="modal fade" id="envModal" tabindex="-1" aria-labelledby="envModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="envModalLabel"><i class="bi bi-gear"></i> 編輯環境變數</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 修改後將立即寫入 .env 並更新當前執行環境。
+                    </div>
+                    <div class="row g-3" id="envForm">
+                        <!-- 動態填充 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEnvVars()">
+                        <i class="bi bi-save"></i> 儲存變更
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         function showLoading(message) {
@@ -317,7 +542,7 @@
 
         function clearLog() {
             const logOutput = document.getElementById('logOutput');
-            logOutput.innerHTML = '<span class="info">📝 日誌已清空</span>';
+            logOutput.innerHTML = '<div class="info">📝 日誌已清空</div>';
         }
 
         async function runAction(actionName) {
@@ -330,7 +555,9 @@
                 'reset_all': '重置所有設置',
                 'list_databases': '列出所有數據庫',
                 'check_schema': '檢查 Schema 配置',
-                'show_env': '顯示環境變數'
+                'show_env': '顯示環境變數',
+                'sync_calendar': '同步學期起迄日 (Google Calendar)',
+                'get_env': '讀取環境變數'
             };
 
             const dangerActions = ['clean', 'reset_all'];
@@ -381,6 +608,66 @@
             location.reload();
         }, 300000); // 5 minutes
 
+        // Env Modal Helpers
+        async function openEnvModal() {
+            try {
+                const res = await fetch('/api/notion/env/all');
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    addLog(`❌ 無法讀取環境變數: ${data.message || res.status}`, 'error');
+                    return;
+                }
+                const env = data.data || {};
+                const form = document.getElementById('envForm');
+                form.innerHTML = '';
+                Object.entries(env).forEach(([key, value]) => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6';
+                    col.innerHTML = `
+                        <label class="form-label fw-semibold">${key}</label>
+                        <input type="text" class="form-control form-control-sm" id="env_${key}" value="${value || ''}" placeholder="${key}">
+                    `;
+                    form.appendChild(col);
+                });
+
+                const modal = new bootstrap.Modal(document.getElementById('envModal'));
+                modal.show();
+            } catch (err) {
+                addLog(`❌ 請求失敗: ${err.message}`, 'error');
+            }
+        }
+
+        async function saveEnvVars() {
+            try {
+                const form = document.getElementById('envForm');
+                const inputs = form.querySelectorAll('input');
+                const payload = {};
+                inputs.forEach(inp => {
+                    const key = inp.id.replace('env_', '');
+                    payload[key] = inp.value;
+                });
+
+                addLog('💾 正在更新環境變數...', 'info');
+                const res = await fetch('/api/notion/env/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    addLog('✅ 環境變數已更新並寫入 .env', 'success');
+                    const modalEl = document.getElementById('envModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+                } else {
+                    addLog(`❌ 更新失敗: ${data.message || res.status}`, 'error');
+                    if (data.error) addLog(data.error, 'error');
+                }
+            } catch (err) {
+                addLog(`❌ 請求失敗: ${err.message}`, 'error');
+            }
+        }
+
         // CSV Upload Function
         async function uploadCSV() {
             const databaseSelect = document.getElementById('targetDatabase');
@@ -399,6 +686,17 @@
                 return;
             }
             
+            // 檢查課程導入是否提供了日期
+            if (databaseType === 'courses') {
+                const startDate = document.getElementById('semesterStart').value;
+                const endDate = document.getElementById('semesterEnd').value;
+                
+                if (!startDate || !endDate) {
+                    alert('⚠️ 導入課程時，請設置學期的開始和結束日期');
+                    return;
+                }
+            }
+            
             // 獲取對應的數據庫 ID
             const databaseId = getDatabaseId(databaseType);
             if (!databaseId) {
@@ -413,6 +711,13 @@
                 const formData = new FormData();
                 formData.append('csv_file', file);
                 formData.append('database_id', databaseId);
+                formData.append('database_type', databaseType);
+                
+                // 如果是課程導入，添加學期日期
+                if (databaseType === 'courses') {
+                    formData.append('semester_start', document.getElementById('semesterStart').value);
+                    formData.append('semester_end', document.getElementById('semesterEnd').value);
+                }
                 
                 const response = await fetch('/api/notion/csv/upload', {
                     method: 'POST',
@@ -486,6 +791,16 @@
             
             return databaseMap[databaseType] || null;
         }
+
+        // 監聽數據庫選擇變化，顯示/隱藏學期設置
+        document.getElementById('targetDatabase').addEventListener('change', function() {
+            const semesterSettings = document.getElementById('semesterSettings');
+            if (this.value === 'courses') {
+                semesterSettings.style.display = 'block';
+            } else {
+                semesterSettings.style.display = 'none';
+            }
+        });
     </script>
 </body>
 
