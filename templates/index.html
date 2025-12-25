@@ -2,6 +2,25 @@
 
 {% block content %}
 <div class="row g-4">
+    <!-- Status Indicators -->
+    <div class="col-12 d-flex justify-content-end gap-3 mb-2">
+        <span class="badge bg-white text-secondary border shadow-sm d-flex align-items-center p-2 px-3 fw-normal"
+            id="status-notion">
+            <i class="fa-solid fa-circle text-secondary me-2 small"></i> Notion Connecting...
+        </span>
+        <span class="badge bg-white text-secondary border shadow-sm d-flex align-items-center p-2 px-3 fw-normal"
+            id="status-google">
+            <i class="fa-solid fa-circle text-secondary me-2 small"></i> Tasks Connecting...
+        </span>
+        <span class="badge bg-white text-secondary border shadow-sm d-flex align-items-center p-2 px-3 fw-normal"
+            id="status-classroom">
+            <i class="fa-solid fa-circle text-secondary me-2 small"></i> Classroom Connecting...
+        </span>
+        <span class="badge bg-white text-secondary border shadow-sm d-flex align-items-center p-2 px-3 fw-normal"
+            id="status-n8n">
+            <i class="fa-solid fa-circle text-secondary me-2 small"></i> N8N Connecting...
+        </span>
+    </div>
     <!-- Top Row: Notion Tasks -->
     <div class="col-12 mb-4">
         <div class="card h-100 border-0">
@@ -178,4 +197,49 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/ndhu.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                const notionEl = document.getElementById('status-notion');
+                const googleEl = document.getElementById('status-google');
+                const n8nEl = document.getElementById('status-n8n');
+                const classroomEl = document.getElementById('status-classroom');
+
+                // Notion
+                if (data.notion.connected) {
+                    notionEl.innerHTML = '<i class="fa-solid fa-circle text-success me-2 small"></i> Notion 連線正常';
+                } else {
+                    notionEl.innerHTML = `<i class="fa-solid fa-circle text-danger me-2 small"></i> Notion Disconnected`;
+                    notionEl.title = data.notion.msg;
+                }
+
+                // Google Tasks
+                if (data.google_tasks.connected) {
+                    googleEl.innerHTML = '<i class="fa-solid fa-circle text-success me-2 small"></i> Tasks 連線正常';
+                } else {
+                    googleEl.innerHTML = `<i class="fa-solid fa-circle text-danger me-2 small"></i> Tasks Disconnected`;
+                    googleEl.title = data.google_tasks.msg;
+                }
+
+                // N8N
+                if (data.n8n.connected) {
+                    n8nEl.innerHTML = '<i class="fa-solid fa-circle text-success me-2 small"></i> N8N 連線正常';
+                } else {
+                    n8nEl.innerHTML = `<i class="fa-solid fa-circle text-danger me-2 small"></i> N8N Unreachable`;
+                    n8nEl.title = data.n8n.msg;
+                }
+
+                // Classroom
+                if (data.classroom.connected) {
+                    classroomEl.innerHTML = '<i class="fa-solid fa-circle text-success me-2 small"></i> Classroom 連線正常';
+                } else {
+                    classroomEl.innerHTML = `<i class="fa-solid fa-circle text-danger me-2 small"></i> Classroom Disconnected`;
+                    classroomEl.title = data.classroom.msg;
+                }
+            })
+            .catch(err => console.error('Status check failed:', err));
+    });
+</script>
 {% endblock %}

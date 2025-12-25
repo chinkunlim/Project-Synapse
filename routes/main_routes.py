@@ -98,6 +98,61 @@ def submit_homework():
     except Exception as e:
         return f"❌ 系統錯誤: {e}"
 
+@main_bp.route('/api/status')
+def check_status():
+    """
+    Check connection status for Notion, Google Tasks, N8N, and Google Classroom.
+    """
+    status = {
+        "notion": {"connected": False, "msg": "Not initialized"},
+        "google_tasks": {"connected": False, "msg": "Not initialized"},
+        "n8n": {"connected": False, "msg": "Not initialized"},
+        "classroom": {"connected": False, "msg": "Not initialized"}
+    }
+    
+    # Check Notion
+    if extensions.notion:
+        try:
+            extensions.notion.users.me()
+            status["notion"] = {"connected": True, "msg": "Connected"}
+        except Exception as e:
+            status["notion"] = {"connected": False, "msg": str(e)}
+            
+    # Check Google Tasks
+    if extensions.ndhu_integration and extensions.ndhu_integration.tasks_service:
+        try:
+            # Lightweight check: list tasklists (limit 1)
+            extensions.ndhu_integration.tasks_service.tasklists().list(maxResults=1).execute()
+            status["google_tasks"] = {"connected": True, "msg": "Connected"}
+        except Exception as e:
+            status["google_tasks"] = {"connected": False, "msg": str(e)}
+
+    # Check N8N
+    try:
+        # Pinging local N8N container/service
+        # Try service name first (Docker), then localhost (Local Dev)
+        try:
+            resp = requests.get("http://n8n:5678/", timeout=2)
+        except:
+             resp = requests.get("http://localhost:5678/", timeout=2)
+             
+        # 200 is OK, 401/403 means it's there but maybe auth required (still connected)
+        # We assume if we get a response, it's alive.
+        status["n8n"] = {"connected": True, "msg": f"Connected (Status {resp.status_code})"}
+    except Exception as e:
+        status["n8n"] = {"connected": False, "msg": f"Unreachable: {str(e)}"}
+
+    # Check Google Classroom
+    if extensions.classroom_integration and extensions.classroom_integration.classroom_service:
+        try:
+            # Check by listing 1 course
+            extensions.classroom_integration.classroom_service.courses().list(pageSize=1).execute()
+            status["classroom"] = {"connected": True, "msg": "Connected"}
+        except Exception as e:
+             status["classroom"] = {"connected": False, "msg": str(e)}
+    
+    return jsonify(status)
+
 # --- Documentation Viewer Route ---
 
 @main_bp.route('/docs')

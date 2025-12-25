@@ -33,6 +33,34 @@ class GoogleNDHUIntegration:
         self.token_path = Path('config/google_token_ndhu.pickle')
         self.creds = None
         self.tasks_service = None
+        
+        # 嘗試自動載入 Token
+        self._try_load_token()
+
+    def _try_load_token(self):
+        """嘗試從檔案載入 Token 並自動 Refresh"""
+        try:
+            if self.token_path.exists():
+                with open(self.token_path, 'rb') as token:
+                    self.creds = pickle.load(token)
+                
+                if self.creds:
+                    # 如果過期且有 refresh_token，嘗試刷新
+                    if self.creds.expired and self.creds.refresh_token:
+                        try:
+                            self.creds.refresh(Request())
+                            # 刷新後保存新的 Token
+                            with open(self.token_path, 'wb') as token:
+                                pickle.dump(self.creds, token)
+                        except Exception as e:
+                            print(f"⚠️ NDHU Token 刷新失敗: {e}")
+                            self.creds = None
+                    
+                    if self.creds and self.creds.valid:
+                        self.tasks_service = build('tasks', 'v1', credentials=self.creds)
+                        print("✅ Google NDHU (Tasks) Token 載入成功")
+        except Exception as e:
+            print(f"⚠️ NDHU Token 載入失敗: {e}")
 
     def authenticate(self) -> bool:
         """
