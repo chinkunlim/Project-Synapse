@@ -1,7 +1,10 @@
 \documentclass[man, 12pt, a4paper]{apa7}
 \usepackage{xeCJK}
-\setCJKmainfont[AutoFakeBold=3, AutoFakeSlant=true]{PingFang TC}
-\setmainfont{Times New Roman}
+% Use fonts available in the container (fonts-noto-cjk + TeX Gyre)
+\setCJKmainfont{Noto Sans CJK TC}
+\setCJKsansfont{Noto Sans CJK TC}
+\setCJKmonofont{Noto Sans CJK TC}
+\setmainfont{TeX Gyre Termes}
 \usepackage[style=apa, sortcites=true, sorting=nyt, backend=biber]{biblatex}
 \addbibresource{references.bib}
 \usepackage{graphicx}
@@ -11,8 +14,8 @@
 
 \title{\MyTitleEn}
 \shorttitle{\MyShortTitle}
-\author{\MyAuthorEn}
-\affiliation{\MyAffiliationEn}
+\authorsnames{\MyAuthorEn}
+\authorsaffiliations{\MyAffiliationEn}
 \abstract{\MyAbstractEn}
 \keywords{\MyKeywordsEn}
 

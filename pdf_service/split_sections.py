@@ -22,6 +22,20 @@ PANDOC_ARGS = ["-f", "markdown", "-t", "latex", "--biblatex"]
 FORMAT_MAPPING = {"cjp": "main_cjp.tex", "apa": "main_apa.tex"}
 
 
+def ensure_placeholder_png(path: str):
+    """Create a tiny valid PNG placeholder if the target path does not exist."""
+    if os.path.exists(path):
+        return
+    png_bytes = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+        b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0b"
+        b"IDAT\x08\xd7c````\x00\x00\x00\x05\x00\x01\x0d\n\x2d\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(png_bytes)
+
+
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -80,6 +94,14 @@ def transform_content(content):
     return content
 
 
+def ensure_figures_exist(full_content: str):
+    """Create placeholder images for any Figure/* references to avoid LaTeX aborts when files are missing."""
+    figure_refs = re.findall(r"Figure/([^\s}\)]+)", full_content)
+    for ref in figure_refs:
+        target = os.path.join("Figure", ref)
+        ensure_placeholder_png(target)
+
+
 def parse_yaml_to_latex(content):
     latex_lines = ["% Auto-generated metadata"]
     yaml_match = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
@@ -131,11 +153,12 @@ def compile_pdf(tex_file):
         print("⚠️ 警告: 找不到 references.bib，建立空檔案以避免編譯器崩潰。")
         with open("references.bib", "w") as f:
             f.write("")
-
+    # Use latexmk + biber explicitly to ensure bibliography is generated for APA
+    pdf_job = tex_file.replace(".tex", "")
     cmd = [
         LATEXMK_PATH,
+        "-pdf",
         "-xelatex",
-        # "-bibtex",  <--- ❌ 刪除這一行！不要強迫使用 bibtex
         "-synctex=1",
         "-interaction=nonstopmode",
         "-file-line-error",
@@ -143,15 +166,39 @@ def compile_pdf(tex_file):
         tex_file,
     ]
 
-    try:
-        subprocess.run(cmd, check=True)
-        print(f"✅ 成功生成: {tex_file.replace('.tex', '.pdf')}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ 編譯失敗 (Exit Code {e.returncode})")
-        raise e 
-    except Exception as e:
-        print(f"❌ 執行錯誤: {e}")
-        raise e
+    def run_latexmk(pass_name: str, allow_fail: bool = False):
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"⚠️ latexmk {pass_name} 退出碼 {result.returncode}")
+            print(result.stdout)
+            print(result.stderr)
+            if not allow_fail:
+                raise subprocess.CalledProcessError(result.returncode, cmd)
+        return result
+
+    # First pass to produce .bcf even if citations are missing
+    run_latexmk("pass1", allow_fail=True)
+
+    bcf_path = f"{pdf_job}.bcf"
+    if os.path.exists(bcf_path):
+        biber = subprocess.run(["biber", pdf_job], capture_output=True, text=True)
+        if biber.returncode != 0:
+            print("❌ biber 失敗")
+            print(biber.stdout)
+            print(biber.stderr)
+            raise subprocess.CalledProcessError(biber.returncode, biber.args)
+        else:
+            print("✅ biber 完成")
+
+    # Two more passes to resolve references/citations
+    run_latexmk("pass2", allow_fail=True)
+    final_run = run_latexmk("final", allow_fail=True)
+
+    pdf_path = tex_file.replace(".tex", ".pdf")
+    if final_run.returncode != 0 and not os.path.exists(pdf_path):
+        raise subprocess.CalledProcessError(final_run.returncode, cmd)
+
+    print(f"✅ 成功生成: {pdf_path}")
 
 
 def main():
