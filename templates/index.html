@@ -7,25 +7,10 @@
     <title>Project Synapse Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .card {
-            border-radius: 12px;
-            border: none;
-        }
-
-        .card-header {
-            border-radius: 12px 12px 0 0 !important;
-            font-weight: bold;
-        }
-
-        .btn {
-            border-radius: 8px;
-        }
-
-        .status-badge {
-            font-size: 0.9em;
-            padding: 6px 12px;
-            border-radius: 20px;
-        }
+        .card { border-radius: 12px; border: none; }
+        .card-header { border-radius: 12px 12px 0 0 !important; font-weight: bold; }
+        .btn { border-radius: 8px; }
+        .status-badge { font-size: 0.9em; padding: 6px 12px; border-radius: 20px; }
     </style>
 </head>
 
@@ -55,17 +40,10 @@
                             <tr>
                                 <td class="fw-bold">{{ task.task }}</td>
                                 <td>{{ task.deadline }}</td>
-                                <td>
-                                    <span
-                                        class="badge status-badge bg-{{ 'success' if task.status == 'Done' else 'warning' }}">
-                                        {{ task.status }}
-                                    </span>
-                                </td>
+                                <td>{{ task.status }}</td>
                             </tr>
                             {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-4">目前沒有任務，或無法連線至 Notion。</td>
-                            </tr>
+                            <tr><td colspan="3" class="text-center text-muted py-4">目前沒有任務，或無法連線至 Notion。</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -73,124 +51,434 @@
             </div>
         </div>
 
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0 text-info">📝 待辦任務列表 (From NDHU)</h5>
+                    <small class="text-muted">Google Tasks</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button id="ndhu-refresh-btn" type="button" class="btn btn-sm btn-outline-info" onclick="refreshNDHUTasks()">🔄 刷新</button>
+                    <button id="ndhu-auth-btn" type="button" class="btn btn-sm btn-outline-warning" onclick="authenticateNDHU()">🔑 認證</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="ndhu-loading" class="text-center text-muted py-4">
+                    <p>正在載入 NDHU 任務...</p>
+                </div>
+                <div id="ndhu-content" style="display:none;">
+                    <div class="mb-3">
+                        <h6 class="text-secondary">建立新任務</h6>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <select id="ndhu-tasklist-select" class="form-select">
+                                    <option value="" disabled selected>選擇任務清單</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input id="ndhu-task-title" type="text" class="form-control" placeholder="任務標題">
+                            </div>
+                            <div class="col-md-4">
+                                <input id="ndhu-task-due" type="datetime-local" class="form-control" placeholder="截止日期 (可選)">
+                            </div>
+                            <div class="col-12 mt-2">
+                                <input id="ndhu-task-notes" type="text" class="form-control" placeholder="備註 (可選)">
+                            </div>
+                            <div class="col-12 mt-2 text-end">
+                                <button id="ndhu-create-btn" class="btn btn-sm btn-primary" onclick="createNDHUTask()">➕ 建立任務</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">任務/筆記</th>
+                                    <th scope="col">截止日期</th>
+                                    <th scope="col">來源</th>
+                                    <th scope="col">狀態</th>
+                                    <th scope="col">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ndhu-tasks-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="ndhu-error" style="display:none;" class="alert alert-warning mb-0">
+                    <p id="ndhu-error-msg"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 text-warning">🗒️ Google Keep</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-0">Google Keep 同步已停用（官方 Keep API scope 受限）。請使用 Google Tasks 區塊管理與同步待辦。</p>
+            </div>
+        </div>
+
         <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-success h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">👨‍🏫 教師模式 (Educator)</h5>
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white text-dark">
+                        <h5 class="mb-0">⚡ 快捷操作</h5>
                     </div>
-                    <div class="card-body text-center d-flex flex-column justify-content-center">
-                        <p class="card-text text-muted mb-4">
-                            同步 Google Classroom 成績至 Notion 資料庫，並自動發送缺交提醒。
-                        </p>
-                        <form action="/trigger-n8n" method="POST" target="_blank">
-                            <button type="submit" class="btn btn-outline-success w-100 py-2">
-                                🚀 觸發 N8N 自動化流程
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4 text-end">
-                <a href="/notion" class="btn btn-outline-dark btn-lg w-100 py-3">
-                    ⚙️ Notion 系統管理
-                </a>
-            </div>
-            <div class="card shadow-sm border-danger mb-4">
-                <div class="col-12 mb-4">
-                    <div class="card shadow-sm border-danger">
-                        <div class="card-header bg-danger text-white">⚙️ 系統初始化與配置</div>
-                        <div class="card-body">
-                            <p class="text-muted">第一次使用或需要重建 Notion 環境時，請點擊下方按鈕。這將會讀取
-                                <code>config/notion_schema.json</code> 並自動建立資料庫。</p>
-                            <button onclick="initNotion()" class="btn btn-danger" id="initBtn">🚀 一鍵初始化 Notion
-                                環境</button>
-                            <div id="setup-status" class="mt-2 fw-bold"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6 mb-4">
-                    <div class="card shadow-sm border-primary h-100">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">👨‍🎓 學生專區 (Student)</h5>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted small mb-3">選擇任務並上傳您的作業檔案至系統。</p>
-
-                            <form action="/student/submit" method="POST" enctype="multipart/form-data">
-
-                                <div class="mb-3">
-                                    <label class="form-label">您的姓名</label>
-                                    <input type="text" name="student_name" class="form-control" placeholder="請輸入姓名"
-                                        required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">選擇任務</label>
-                                    <select name="task_name" class="form-select" required>
-                                        <option value="" disabled selected>-- 請選擇要繳交的作業 --</option>
-                                        {% for task in tasks %}
-                                        {% if task.status != 'Done' %}
-                                        <option value="{{ task.task }}">{{ task.task }} (截止: {{ task.deadline }})
-                                        </option>
-                                        {% endif %}
-                                        {% endfor %}
-                                    </select>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">作業檔案</label>
-                                    <input type="file" name="homework_file" class="form-control" required>
-                                </div>
-
-                                <button type="submit" class="btn btn-primary w-100">
-                                    📤 提交作業 (Upload)
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-12 mb-4">
-                    <div class="card shadow-sm border-dark">
-                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">🛠️ 學術生產力工具 (Academic Tools)</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row align-items-center">
-                                <div class="col-md-8">
-                                    <h5 class="card-title fw-bold">📄 論文編譯工廠 (PDF Factory)</h5>
-                                    <p class="card-text text-muted mb-0">
-                                        專為學術寫作設計。上傳 Markdown 檔案與圖片，系統將自動排版並生成符合
-                                        <strong>中華心理學刊 (CJP)</strong> 或 <strong>APA 7th</strong> 格式的 PDF 論文。
-                                        <br><small class="text-secondary">* 支援 LaTeX 數學公式、自動圖表編號與文獻引用。</small>
-                                    </p>
-                                </div>
-                                <div class="col-md-4 text-end mt-3 mt-md-0">
-                                    <a href="/thesis" class="btn btn-dark btn-lg w-100 py-3">
-                                        🚀 進入編譯工廠
-                                    </a>
-                                </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <a href="/notion" class="btn btn-outline-dark w-100 py-3">⚙️ Notion 系統管理</a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="https://classroom.google.com" class="btn btn-outline-secondary w-100 py-3" target="_blank">🎓 Google Classroom</a>
+                            </div>
+                            <div class="col-md-3">
+                                <form action="/trigger-n8n" method="POST" target="_blank">
+                                    <button type="submit" class="btn btn-outline-success w-100 py-3">🚀 觸發 N8N 流程</button>
+                                </form>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/thesis" class="btn btn-outline-primary w-100 py-3">📄 PDF / 論文編譯</a>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
 
-        <footer class="text-center text-muted py-4 small">
-            &copy; 2025 Project Synapse. Powered by Flask, Notion API, Docker & N8N.
-        </footer>
+    </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <footer class="text-center text-muted py-4 small">
+        &copy; 2025 Project Synapse. Powered by Flask, Notion API, Docker & N8N.
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 <script>
+    // Toast 通知容器與工具方法
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+    toastContainer.style.zIndex = '1080';
+    document.body.appendChild(toastContainer);
+
+    function showToast(message, type = 'info') {
+        const bg = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : type === 'warning' ? 'bg-warning text-dark' : 'bg-secondary';
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast align-items-center text-white ${bg}`;
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        toastContainer.appendChild(toastEl);
+        const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+        toast.show();
+        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    }
+
+    // 載入 NDHU 任務
+    function loadNDHUTasks() {
+        const loading = document.getElementById('ndhu-loading');
+        const content = document.getElementById('ndhu-content');
+        const error = document.getElementById('ndhu-error');
+        const tbody = document.getElementById('ndhu-tasks-tbody');
+        const authBtn = document.getElementById('ndhu-auth-btn');
+        const refreshBtn = document.getElementById('ndhu-refresh-btn');
+        const reauthBtn = document.getElementById('ndhu-reauth-btn');
+        
+        if (refreshBtn) refreshBtn.disabled = true;
+
+        fetch('/api/ndhu/tasks')
+            .then(response => {
+                if (response.status === 401) {
+                    return response.json().then(data => {
+                        throw { status: 401, message: data.message };
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.status === 'success') {
+                    if (data.items && data.items.length > 0) {
+                        // 建立子任務映射（依 parent 分組）
+                        const childrenMap = {};
+                        data.items.forEach(t => {
+                            if (t.parent) {
+                                (childrenMap[t.parent] ||= []).push(t);
+                            }
+                        });
+
+                        let html = '';
+                        data.items
+                            .filter(item => !item.parent) // 僅渲染頂層任務
+                            .forEach(item => {
+                                const badge = item.status === 'completed' 
+                                    ? '<span class="badge bg-success">完成</span>' 
+                                    : item.status === 'needsAction'
+                                    ? '<span class="badge bg-warning">待辦</span>'
+                                    : '<span class="badge bg-secondary">其他</span>';
+
+                                const source = '<span class="badge bg-primary">Google Tasks</span>';
+
+                                const due = item.due ? new Date(item.due).toLocaleDateString('zh-TW') : '無';
+                                const actions = `
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-success" ${item.status === 'completed' ? 'disabled' : ''}
+                                            onclick="completeNDHUTask('${item.tasklistId}', '${item.id}')">✅ 完成</button>
+                                        <button class="btn btn-outline-danger" onclick="deleteNDHUTask('${item.tasklistId}', '${item.id}')">🗑️ 刪除</button>
+                                    </div>
+                                `;
+
+                                // 顯示內容（notes）與子任務清單
+                                const notes = item.description ? `<div class="text-muted small">${item.description}</div>` : '';
+                                const children = childrenMap[item.id] || [];
+                                const childList = children.length
+                                    ? `<ul class="small text-muted mb-0">${children.map(c => `<li>${c.title}${c.description ? ' - ' + c.description : ''}</li>`).join('')}</ul>`
+                                    : '';
+
+                                html += `
+                                    <tr>
+                                        <td class="fw-bold">${item.title}${notes}${childList}</td>
+                                        <td>${due}</td>
+                                        <td>${source}</td>
+                                        <td>${badge}</td>
+                                        <td>${actions}</td>
+                                    </tr>
+                                `;
+                            });
+                        // 將生成的列插入表格
+                        tbody.innerHTML = html;
+                        content.style.display = 'block';
+                    } else {
+                        error.style.display = 'block';
+                        document.getElementById('ndhu-error-msg').innerText = '目前沒有任務。';
+                    }
+                    // 載入任務清單下拉
+                    loadNDHUTasklists();
+                    if (refreshBtn) refreshBtn.disabled = false;
+                } else if (data.message && data.message.includes('認證')) {
+                    authBtn.style.display = 'block';
+                    error.style.display = 'block';
+                    document.getElementById('ndhu-error-msg').innerHTML = 
+                        '需要認證。<a href="javascript:authenticateNDHU()" class="btn-link">點擊此處認證</a>';
+                } else {
+                    error.style.display = 'block';
+                    document.getElementById('ndhu-error-msg').innerText = data.message || '無法載入 NDHU 任務';
+                    if (refreshBtn) refreshBtn.disabled = false;
+                }
+            })
+            .catch(err => {
+                loading.style.display = 'none';
+                if (err.status === 401) {
+                    authBtn.style.display = 'block';
+                    error.style.display = 'block';
+                    document.getElementById('ndhu-error-msg').innerHTML = 
+                        '需要認證。<a href="javascript:authenticateNDHU()" class="btn-link">點擊此處認證</a>';
+                } else {
+                    error.style.display = 'block';
+                    document.getElementById('ndhu-error-msg').innerText = '載入失敗: ' + (err.message || '未知錯誤');
+                }
+                if (refreshBtn) refreshBtn.disabled = false;
+                if (reauthBtn) reauthBtn.disabled = false;
+            });
+    }
+
+    // 載入 NDHU 任務清單
+    function loadNDHUTasklists() {
+        const select = document.getElementById('ndhu-tasklist-select');
+        if (!select) return;
+        fetch('/api/ndhu/tasklists')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status !== 'success') return;
+                select.innerHTML = '<option value="" disabled selected>選擇任務清單</option>' +
+                    data.lists.map(l => `<option value="${l.id}">${l.title}</option>`).join('');
+            })
+            .catch(() => {});
+    }
+
+    // 建立 NDHU 任務
+    function createNDHUTask() {
+        const btn = document.getElementById('ndhu-create-btn');
+        const listId = document.getElementById('ndhu-tasklist-select').value;
+        const title = document.getElementById('ndhu-task-title').value;
+        const notes = document.getElementById('ndhu-task-notes').value;
+        const dueInput = document.getElementById('ndhu-task-due').value;
+        if (!listId || !title) {
+            showToast('請選擇清單並輸入標題', 'warning');
+            return;
+        }
+        btn.disabled = true;
+        let due = null;
+        if (dueInput) {
+            // 轉換為 ISO 字串（本地時間 -> UTC 略過，Tasks 支援 RFC3339）
+            const d = new Date(dueInput);
+            due = d.toISOString();
+        }
+        fetch('/api/ndhu/tasks/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasklist_id: listId, title, notes, due })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('ndhu-task-title').value = '';
+                document.getElementById('ndhu-task-notes').value = '';
+                document.getElementById('ndhu-task-due').value = '';
+                refreshNDHUTasks();
+                showToast('已建立任務', 'success');
+            } else {
+                showToast('建立失敗: ' + (data.message || '未知錯誤'), 'error');
+                if ((data.message || '').includes('重新認證')) {
+                    const authBtn = document.getElementById('ndhu-auth-btn');
+                    if (authBtn) authBtn.style.display = 'block';
+                }
+            }
+        })
+        .catch(err => showToast('建立失敗: ' + (err.message || '未知錯誤'), 'error'))
+        .finally(() => { btn.disabled = false; });
+    }
+
+    // 完成 NDHU 任務
+    function completeNDHUTask(tasklistId, taskId) {
+        fetch('/api/ndhu/tasks/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasklist_id: tasklistId, task_id: taskId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                refreshNDHUTasks();
+                showToast('已標記為完成', 'success');
+            } else {
+                showToast('標記完成失敗: ' + (data.message || '未知錯誤'), 'error');
+            }
+        })
+        .catch(err => showToast('標記完成失敗: ' + (err.message || '未知錯誤'), 'error'));
+    }
+
+    // 刪除 NDHU 任務
+    function deleteNDHUTask(tasklistId, taskId) {
+        if (!confirm('確定要刪除此任務嗎？')) return;
+        fetch('/api/ndhu/tasks/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasklist_id: tasklistId, task_id: taskId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                refreshNDHUTasks();
+                showToast('已刪除任務', 'success');
+            } else {
+                showToast('刪除失敗: ' + (data.message || '未知錯誤'), 'error');
+            }
+        })
+        .catch(err => showToast('刪除失敗: ' + (err.message || '未知錯誤'), 'error'));
+    }
+
+    // NDHU 認證（支援首次認證和重新認證）
+    function authenticateNDHU() {
+        // 檢查是否已認證，如果是則先清除 token
+        fetch('/api/ndhu/tasks', { method: 'GET' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success' && data.data && data.data.length >= 0) {
+                    // 已認證，詢問是否重新認證
+                    if (!confirm('已認證。要重新認證以更新權限嗎？')) return;
+                    resetAndAuth();
+                } else {
+                    // 未認證或出錯，直接認證
+                    showToast('正在開啟 Google 認證...', 'info');
+                    startAuth();
+                }
+            })
+            .catch(() => {
+                // 錯誤或未認證，直接認證
+                showToast('正在開啟 Google 認證...', 'info');
+                startAuth();
+            });
+    }
+
+    function resetAndAuth() {
+        showToast('正在清除憑證並重新認證...', 'info');
+        fetch('/api/ndhu/auth/reset', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast('已清除憑證，請完成重新認證', 'success');
+                    startAuth();
+                } else {
+                    showToast('清除憑證失敗: ' + (data.message || '未知錯誤'), 'error');
+                }
+            })
+            .catch(err => showToast('重新認證失敗: ' + (err.message || '未知錯誤'), 'error'));
+    }
+
+    function startAuth() {
+        fetch('/api/ndhu/auth/start')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = data.authorization_url;
+                } else {
+                    showToast('認證失敗: ' + (data.message || '未知錯誤'), 'error');
+                }
+            })
+            .catch(err => showToast('無法產生認證網址: ' + (err.message || '未知錯誤'), 'error'));
+    }
+
+        // 手動刷新
+        function refreshNDHUTasks() {
+            const loading = document.getElementById('ndhu-loading');
+            const content = document.getElementById('ndhu-content');
+            const error = document.getElementById('ndhu-error');
+        
+            loading.style.display = 'block';
+            content.style.display = 'none';
+            error.style.display = 'none';
+        
+            loadNDHUTasks();
+        }
+
+        // 自動刷新計時器（每 60 秒刷新一次）
+        let ndhuRefreshInterval;
+        function startNDHUAutoRefresh() {
+            // 初始載入
+            loadNDHUTasks();
+        
+            // 每 60 秒自動刷新
+            ndhuRefreshInterval = setInterval(loadNDHUTasks, 60000);
+        }
+
+        function stopNDHUAutoRefresh() {
+            if (ndhuRefreshInterval) {
+                clearInterval(ndhuRefreshInterval);
+            }
+        }
+
+    // 立即啟動自動刷新（腳本位於頁尾，DOM 已可用）
+    startNDHUAutoRefresh();
+
+    // 頁面關閉時停止計時器
+    window.addEventListener('beforeunload', stopNDHUAutoRefresh);
+
+    // 綁定 NDHU 刷新按鈕事件
+    const refreshBtn = document.getElementById('ndhu-refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', refreshNDHUTasks);
+
+    // Google Keep 同步已停用，無前端邏輯
+
     function initNotion() {
         if (!confirm("這將會在您的 Notion 頁面建立新資料庫，確定嗎？")) return;
 

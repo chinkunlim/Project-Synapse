@@ -1,4 +1,9 @@
 .env
 __pycache__/
 .DS_Store
-n8n_data/git
+n8n_data/git*.pickle
+*.json
+!samples/
+config/google_*.json
+config/google_token*.pickle
+logs/app.log

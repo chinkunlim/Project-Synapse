@@ -1,8 +1,8 @@
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║         🎓 PROJECT SYNAPSE - TAIWAN COURSE SYSTEM (v1.0)                 ║
+║         🎓 PROJECT SYNAPSE - TAIWAN COURSE SYSTEM (v1.0)                  ║
 ║                                                                           ║
-║                      ✅ SYSTEM COMPLETE & TESTED                         ║
+║                      ✅ SYSTEM COMPLETE & TESTED                          ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 

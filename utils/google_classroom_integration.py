@@ -265,7 +265,10 @@ class GoogleClassroomIntegration:
             return []
 
     def create_assignment(self, course_id: str, title: str, description: str = "", max_points: Optional[int] = None,
-                           due_date: Optional[Dict] = None, topic_id: Optional[str] = None, state: str = 'PUBLISHED') -> Optional[Dict]:
+                           due_date: Optional[Dict] = None, due_time: Optional[Dict] = None, topic_id: Optional[str] = None,
+                           state: str = 'PUBLISHED', drive_file_ids: Optional[List[str]] = None, links: Optional[List[str]] = None,
+                           assignee_mode: str = 'ALL_STUDENTS', student_ids: Optional[List[str]] = None,
+                           grade_category_id: Optional[str] = None, grading_period_id: Optional[str] = None) -> Optional[Dict]:
         """
         建立作業（CourseWork）
 
@@ -292,8 +295,40 @@ class GoogleClassroomIntegration:
                 body["maxPoints"] = int(max_points)
             if due_date:
                 body["dueDate"] = due_date
+            if due_time:
+                body["dueTime"] = due_time
             if topic_id:
                 body["topicId"] = topic_id
+            if grade_category_id:
+                body["gradeCategoryId"] = grade_category_id
+            if grading_period_id:
+                body["gradingPeriodId"] = grading_period_id
+
+            # 附件材料
+            materials = []
+            if drive_file_ids:
+                for fid in drive_file_ids:
+                    if fid:
+                        materials.append({
+                            "driveFile": {
+                                "driveFile": {"id": fid}
+                            }
+                        })
+            if links:
+                for url in links:
+                    if url:
+                        materials.append({
+                            "link": {"url": url}
+                        })
+            if materials:
+                body["materials"] = materials
+
+            # 指派對象
+            if assignee_mode == 'INDIVIDUAL_STUDENTS' and student_ids:
+                body["assigneeMode"] = 'INDIVIDUAL_STUDENTS'
+                body["individualStudentsOptions"] = {"studentIds": student_ids}
+            else:
+                body["assigneeMode"] = 'ALL_STUDENTS'
             coursework = self.classroom_service.courses().courseWork().create(
                 courseId=course_id,
                 body=body
@@ -393,7 +428,8 @@ class GoogleClassroomIntegration:
         created_topics = []
         
         try:
-            for week in range(1, num_weeks + 1):
+            # 從最後一項開始建立（反向）
+            for week in range(num_weeks, 0, -1):
                 topic_name = f"{prefix} {week}"
                 
                 topic = self.classroom_service.courses().topics().create(
@@ -459,24 +495,50 @@ class GoogleClassroomIntegration:
         try:
             if not file_name:
                 file_name = Path(file_path).name
-            
+
             file_metadata = {'name': file_name}
             media = MediaFileUpload(file_path, resumable=True)
-            
+
             file = self.drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id'
             ).execute()
-            
+
             file_id = file.get('id')
             print(f"✅ 檔案已上傳至 Drive: {file_name} (ID: {file_id})")
-            
+
             return file_id
-            
         except Exception as e:
             print(f"❌ 上傳檔案失敗: {e}")
             return None
+
+    def list_drive_files(self, query: Optional[str] = None, page_size: int = 50) -> List[Dict]:
+        """
+        取得 Google Drive 檔案列表（不含資料夾）
+
+        Args:
+            query: Drive 搜尋字串（可為 None 表示不過濾）
+            page_size: 每頁筆數
+
+        Returns:
+            List[Dict]: 檔案資訊
+        """
+        try:
+            q = "trashed = false and mimeType != 'application/vnd.google-apps.folder'"
+            if query:
+                # 基本名稱搜尋
+                safe_query = query.replace("'", "\\'")
+                q += f" and name contains '{safe_query}'"
+            results = self.drive_service.files().list(
+                q=q,
+                pageSize=page_size,
+                fields="files(id, name, mimeType, modifiedTime, owners(emailAddress, displayName))"
+            ).execute()
+            return results.get('files', [])
+        except Exception as e:
+            print(f"❌ 讀取 Drive 檔案失敗: {e}")
+            return []
     
     def create_course_material(
         self, 

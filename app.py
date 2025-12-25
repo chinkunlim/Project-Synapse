@@ -13,6 +13,8 @@ from intergrations.notion import (
 )
 from utils.google_calendar_sync import GoogleCalendarIntegration
 from utils.google_classroom_integration import GoogleClassroomIntegration
+from utils.google_ndhu_integration import GoogleNDHUIntegration
+from utils.keep_import_parser import parse_keep_takeout_zip
 
 # 初始化日誌系統
 setup_logging()
@@ -27,6 +29,8 @@ os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
 # 初始化 Flask 應用
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret')
+DATA_DIR = Path('data').resolve()
+DATA_DIR.mkdir(exist_ok=True)
 
 # 初始化 Notion 客戶端（若失敗不影響 App 啟動）
 try:
@@ -45,6 +49,13 @@ try:
 except Exception as e:
     print(f"Google Classroom 初始化警告: {e}")
     classroom_integration = None
+
+# 初始化 Google NDHU 整合（若失敗不影響 App 啟動）
+try:
+    ndhu_integration = GoogleNDHUIntegration()
+except Exception as e:
+    print(f"Google NDHU 初始化警告: {e}")
+    ndhu_integration = None
 
 def fetch_tasks_from_notion():
     """從 Notion 讀取任務"""
@@ -76,7 +87,16 @@ def fetch_tasks_from_notion():
 @app.route('/')
 def index():
     real_tasks = fetch_tasks_from_notion()
-    return render_template('index.html', tasks=real_tasks)
+    
+    # 嘗試取得 NDHU 任務
+    ndhu_tasks = []
+    if ndhu_integration:
+        try:
+            ndhu_tasks = ndhu_integration.get_all_tasks()
+        except Exception as e:
+            print(f"NDHU 任務讀取失敗: {e}")
+    
+    return render_template('index.html', tasks=real_tasks, ndhu_tasks=ndhu_tasks)
 
 @app.route('/trigger-n8n', methods=['POST'])
 def trigger_n8n():
@@ -658,6 +678,338 @@ def download_csv_sample(database_type):
             "message": f"❌ 生成樣本失敗: {str(e)}"
         }), 500
 
+# === Google NDHU 路由 ===
+
+@app.route('/api/ndhu/auth/start', methods=['GET'])
+def ndhu_auth_start():
+    """取得 Google OAuth 授權網址（NDHU Web Flow）"""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        from flask import session
+        import json
+
+        if not ndhu_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google NDHU 整合未初始化"
+            }), 500
+
+        # 檢查憑證類型與 redirect_uri
+        cred_path = 'config/google_credential_ndhu.json'
+        with open(cred_path, 'r') as f:
+            cred_json = json.load(f)
+        is_web = 'web' in cred_json
+        is_installed = 'installed' in cred_json
+
+        # 使用 Web 應用程式流程產生授權網址
+        redirect_uri = 'http://localhost:5001/api/ndhu/auth/callback'
+        if is_web:
+            allowed_redirects = cred_json['web'].get('redirect_uris', [])
+            if redirect_uri not in allowed_redirects:
+                return jsonify({
+                    "status": "error",
+                    "message": "❌ OAuth 設定錯誤：請在 Google Cloud Console 的 NDHU OAuth 用戶端 (web) 中加入 redirect URI: " + redirect_uri
+                }), 400
+        elif is_installed:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 目前使用的是 Installed 憑證。請建立 'Web application' 類型的 OAuth 用戶端，並設定 redirect URI: " + redirect_uri
+            }), 400
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "❌ NDHU 憑證格式不正確，請提供 Google OAuth 用戶端 JSON (web)"
+            }), 400
+        flow = Flow.from_client_secrets_file(
+            'config/google_credential_ndhu.json',
+            scopes=ndhu_integration.SCOPES,
+            redirect_uri=redirect_uri
+        )
+
+        auth_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent select_account'
+        )
+
+        # 保存 state 以便回調驗證
+        session['ndhu_oauth_state'] = state
+
+        return jsonify({
+            "status": "success",
+            "authorization_url": auth_url
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 產生授權網址失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/ndhu/auth/start/redirect', methods=['GET'])
+def ndhu_auth_start_redirect():
+    """取得授權網址並直接 302 導向（前端備援用）"""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        from flask import session, redirect
+        import json
+
+        if not ndhu_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google NDHU 整合未初始化"
+            }), 500
+
+        cred_path = 'config/google_credential_ndhu.json'
+        with open(cred_path, 'r') as f:
+            cred_json = json.load(f)
+        is_web = 'web' in cred_json
+        is_installed = 'installed' in cred_json
+
+        redirect_uri = 'http://localhost:5001/api/ndhu/auth/callback'
+        if is_web:
+            allowed_redirects = cred_json['web'].get('redirect_uris', [])
+            if redirect_uri not in allowed_redirects:
+                return jsonify({
+                    "status": "error",
+                    "message": "❌ OAuth 設定錯誤：請在 Google Cloud Console 的 NDHU OAuth 用戶端 (web) 中加入 redirect URI: " + redirect_uri
+                }), 400
+        elif is_installed:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 目前使用的是 Installed 憑證。請建立 'Web application' 類型的 OAuth 用戶端，並設定 redirect URI: " + redirect_uri
+            }), 400
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "❌ NDHU 憑證格式不正確，請提供 Google OAuth 用戶端 JSON (web)"
+            }), 400
+
+        flow = Flow.from_client_secrets_file(
+            'config/google_credential_ndhu.json',
+            scopes=ndhu_integration.SCOPES,
+            redirect_uri=redirect_uri
+        )
+        auth_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent select_account'
+        )
+        session['ndhu_oauth_state'] = state
+        return redirect(auth_url)
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 產生授權網址失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/ndhu/auth/callback', methods=['GET'])
+def ndhu_auth_callback():
+    """Google OAuth 回調（NDHU Web Flow）"""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        from flask import session, redirect
+
+        if not ndhu_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google NDHU 整合未初始化"
+            }), 500
+
+        redirect_uri = 'http://localhost:5001/api/ndhu/auth/callback'
+        state = session.get('ndhu_oauth_state')
+
+        # 若未能取得 state（例如瀏覽器阻擋第三方 Cookie），則降級不驗證 state
+        if state:
+            flow = Flow.from_client_secrets_file(
+                'config/google_credential_ndhu.json',
+                scopes=ndhu_integration.SCOPES,
+                redirect_uri=redirect_uri,
+                state=state
+            )
+        else:
+            print('⚠️ NDHU OAuth state 未找到，將在無 state 模式下繼續交換 token')
+            flow = Flow.from_client_secrets_file(
+                'config/google_credential_ndhu.json',
+                scopes=ndhu_integration.SCOPES,
+                redirect_uri=redirect_uri
+            )
+
+        # 使用完整的回調 URL 完成 token 交換
+        flow.fetch_token(authorization_response=request.url)
+
+        # 初始化整合並保存憑證
+        success = ndhu_integration.set_credentials(flow.credentials)
+        if not success:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 保存 NDHU 憑證失敗"
+            }), 500
+
+        # 回到首頁
+        return redirect('/')
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ NDHU 認證回調錯誤: {str(e)}"
+        }), 500
+
+@app.route('/api/ndhu/tasks', methods=['GET'])
+def get_ndhu_tasks():
+    """取得 NDHU 帳戶的 Google Tasks（不含 Keep）"""
+    try:
+        if not ndhu_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ NDHU 整合未初始化"
+            }), 500
+        
+        # 未完成 Web OAuth（沒有 service）時，提示前端進行認證
+        if not ndhu_integration.tasks_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ NDHU 尚未認證，請點擊按鈕進行授權"
+            }), 401
+        
+        tasks = ndhu_integration.get_all_tasks()
+        
+        return jsonify({
+            "status": "success",
+            "items": tasks,
+            "count": len(tasks)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 讀取 NDHU 任務失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/ndhu/tasklists', methods=['GET'])
+def get_ndhu_tasklists():
+    """列出 NDHU Google Tasks 的任務清單"""
+    try:
+        if not ndhu_integration:
+            return jsonify({"status": "error", "message": "❌ NDHU 整合未初始化"}), 500
+        if not ndhu_integration.tasks_service:
+            return jsonify({"status": "error", "message": "❌ NDHU 尚未認證，請先完成授權"}), 401
+        lists = ndhu_integration.list_tasklists()
+        return jsonify({"status": "success", "lists": lists, "count": len(lists)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 讀取清單失敗: {str(e)}"}), 500
+
+@app.route('/api/ndhu/tasks/create', methods=['POST'])
+def ndhu_create_task():
+    """建立 NDHU Google Tasks 任務"""
+    try:
+        if not ndhu_integration or not ndhu_integration.tasks_service:
+            return jsonify({"status": "error", "message": "❌ NDHU 尚未認證，請先完成授權"}), 401
+        data = request.get_json(silent=True) or request.form
+        tasklist_id = data.get('tasklist_id')
+        title = data.get('title')
+        notes = data.get('notes')
+        due = data.get('due')  # ISO 8601 string, e.g., 2025-01-15T23:59:00.000Z
+        parent = data.get('parent')
+        if not tasklist_id or not title:
+            return jsonify({"status": "error", "message": "❌ 缺少必要參數 (tasklist_id, title)"}), 400
+        # 嘗試建立任務（需要 Tasks 寫入權限）
+        try:
+            task = ndhu_integration.create_task(tasklist_id, title, notes, due, parent)
+        except Exception as err:
+            try:
+                from googleapiclient.errors import HttpError
+                if isinstance(err, HttpError) and getattr(err, 'status_code', None) in (401, 403):
+                    return jsonify({"status": "error", "message": "❌ 需要重新認證以授權 Google Tasks 寫入權限"}), 401
+            except Exception:
+                pass
+            raise
+        if task:
+            return jsonify({"status": "success", "task": task})
+        return jsonify({"status": "error", "message": "❌ 建立任務失敗"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 建立任務錯誤: {str(e)}"}), 500
+
+@app.route('/api/ndhu/tasks/complete', methods=['POST'])
+def ndhu_complete_task():
+    """將 NDHU Google Tasks 任務標記為完成"""
+    try:
+        if not ndhu_integration or not ndhu_integration.tasks_service:
+            return jsonify({"status": "error", "message": "❌ NDHU 尚未認證，請先完成授權"}), 401
+        data = request.get_json(silent=True) or request.form
+        tasklist_id = data.get('tasklist_id')
+        task_id = data.get('task_id')
+        if not tasklist_id or not task_id:
+            return jsonify({"status": "error", "message": "❌ 缺少必要參數 (tasklist_id, task_id)"}), 400
+        try:
+            updated = ndhu_integration.complete_task(tasklist_id, task_id)
+        except Exception as err:
+            try:
+                from googleapiclient.errors import HttpError
+                if isinstance(err, HttpError) and getattr(err, 'status_code', None) in (401, 403):
+                    return jsonify({"status": "error", "message": "❌ 需要重新認證以授權 Google Tasks 寫入權限"}), 401
+            except Exception:
+                pass
+            raise
+        if updated:
+            return jsonify({"status": "success", "task": updated})
+        return jsonify({"status": "error", "message": "❌ 標記完成失敗"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 標記完成錯誤: {str(e)}"}), 500
+
+@app.route('/api/ndhu/tasks/delete', methods=['POST'])
+def ndhu_delete_task():
+    """刪除 NDHU Google Tasks 任務"""
+    try:
+        if not ndhu_integration or not ndhu_integration.tasks_service:
+            return jsonify({"status": "error", "message": "❌ NDHU 尚未認證，請先完成授權"}), 401
+        data = request.get_json(silent=True) or request.form
+        tasklist_id = data.get('tasklist_id')
+        task_id = data.get('task_id')
+        if not tasklist_id or not task_id:
+            return jsonify({"status": "error", "message": "❌ 缺少必要參數 (tasklist_id, task_id)"}), 400
+        try:
+            ok = ndhu_integration.delete_task(tasklist_id, task_id)
+        except Exception as err:
+            try:
+                from googleapiclient.errors import HttpError
+                if isinstance(err, HttpError) and getattr(err, 'status_code', None) in (401, 403):
+                    return jsonify({"status": "error", "message": "❌ 需要重新認證以授權 Google Tasks 寫入權限"}), 401
+            except Exception:
+                pass
+            raise
+        if ok:
+            return jsonify({"status": "success", "message": "✅ 已刪除"})
+        return jsonify({"status": "error", "message": "❌ 刪除失敗"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 刪除錯誤: {str(e)}"}), 500
+
+@app.route('/api/ndhu/auth/reset', methods=['POST'])
+def ndhu_auth_reset():
+    """清除 NDHU OAuth 憑證以強制重新認證（升級到寫入權限）"""
+    try:
+        from pathlib import Path
+        token_path = Path('config/google_token_ndhu.pickle')
+        if token_path.exists():
+            token_path.unlink()
+        # 清空現有服務以避免使用舊憑證
+        if ndhu_integration:
+            ndhu_integration.creds = None
+            ndhu_integration.tasks_service = None
+        return jsonify({"status": "success", "message": "✅ 已清除 NDHU 憑證，請重新認證"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 清除憑證失敗: {str(e)}"}), 500
+
+# === Google Keep 路由（已停用，同步需求改為 Tasks 專用） ===
+
+@app.route('/api/keep/items', methods=['GET'])
+def keep_items():
+    return jsonify({"status": "error", "message": "Google Keep 同步已停用，請改用 Google Tasks"}), 400
+
+@app.route('/api/keep/import', methods=['POST'])
+def keep_import():
+    return jsonify({"status": "error", "message": "Google Keep 匯入已停用，請改用 Google Tasks"}), 400
+
 # === Google Classroom 路由 ===
 
 @app.route('/classroom')
@@ -996,7 +1348,8 @@ def import_topics():
                 "message": "❌ CSV 內沒有有效的主題名稱"
             }), 400
 
-        topics = classroom_integration.create_topics_from_names(course_id, names)
+        # 從最後一列開始建立（反向）
+        topics = classroom_integration.create_topics_from_names(course_id, list(reversed(names)))
         return jsonify({
             "status": "success",
             "message": f"✅ 成功建立 {len(topics)} 個主題",
@@ -1058,7 +1411,7 @@ def create_course_material():
             }), 400
         
         # 處理檔案上傳（若有）
-        file_id = None
+        file_id = data.get('drive_file_id') or None
         if 'file' in request.files:
             uploaded_file = request.files['file']
             if uploaded_file.filename:
@@ -1100,6 +1453,19 @@ def create_course_material():
             "message": f"❌ 發布失敗: {str(e)}"
         }), 500
 
+@app.route('/api/drive/files', methods=['GET'])
+def list_drive_files():
+    """列出 Google Drive 檔案（可搜尋）"""
+    try:
+        if not classroom_integration or not classroom_integration.drive_service:
+            return jsonify({"status": "error", "message": "❌ 請先完成認證"}), 401
+        q = request.args.get('q')
+        page_size = int(request.args.get('page_size', 50))
+        files = classroom_integration.list_drive_files(query=q, page_size=page_size)
+        return jsonify({"status": "success", "files": files, "count": len(files)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"❌ 讀取 Drive 檔案失敗: {str(e)}"}), 500
+
 @app.route('/api/classroom/assignment/create', methods=['POST'])
 def create_assignment():
     """發布作業（ASSIGNMENT）"""
@@ -1120,6 +1486,25 @@ def create_assignment():
         due_year = data.get('due_year')
         due_month = data.get('due_month')
         due_day = data.get('due_day')
+        due_hour = data.get('due_hour')
+        due_minute = data.get('due_minute')
+        assignee_mode = data.get('assignee_mode', 'ALL_STUDENTS')
+        student_ids_raw = data.get('student_ids', '')
+        grade_category_id = data.get('grade_category_id')
+        grading_period_id = data.get('grading_period_id')
+        drive_file_ids_raw = data.get('drive_file_ids', '')
+        links_raw = data.get('links', '')
+
+        # 處理上傳附件（若有）並加入 drive_file_ids
+        if 'file' in request.files:
+            uploaded_file = request.files['file']
+            if uploaded_file and uploaded_file.filename:
+                temp_path = f"/tmp/{uploaded_file.filename}"
+                uploaded_file.save(temp_path)
+                fid = classroom_integration.upload_file_to_drive(temp_path, uploaded_file.filename)
+                os.remove(temp_path)
+                if fid:
+                    drive_file_ids_raw = (drive_file_ids_raw + "," + fid) if drive_file_ids_raw else fid
 
         if not course_id or not title:
             return jsonify({
@@ -1130,6 +1515,13 @@ def create_assignment():
         due_date = None
         if due_year and due_month and due_day:
             due_date = {"year": int(due_year), "month": int(due_month), "day": int(due_day)}
+        due_time = None
+        if due_hour is not None and due_minute is not None and str(due_hour) != '' and str(due_minute) != '':
+            due_time = {"hours": int(due_hour), "minutes": int(due_minute)}
+
+        student_ids = [s.strip() for s in student_ids_raw.split(',') if s.strip()] if student_ids_raw else None
+        drive_file_ids = [f.strip() for f in drive_file_ids_raw.split(',') if f.strip()] if drive_file_ids_raw else None
+        links = [l.strip() for l in links_raw.split(',') if l.strip()] if links_raw else None
 
         coursework = classroom_integration.create_assignment(
             course_id=course_id,
@@ -1137,8 +1529,15 @@ def create_assignment():
             description=description,
             max_points=int(max_points) if max_points else None,
             due_date=due_date,
+            due_time=due_time,
             topic_id=topic_id,
-            state=state
+            state=state,
+            drive_file_ids=drive_file_ids,
+            links=links,
+            assignee_mode=assignee_mode,
+            student_ids=student_ids,
+            grade_category_id=grade_category_id,
+            grading_period_id=grading_period_id
         )
 
         if coursework:
