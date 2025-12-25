@@ -11,8 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製所有程式碼到容器內
 COPY . .
 
-# 開放 5000 端口給 Flask 使用
-EXPOSE 5000
+# 開放 5001 端口給 Flask 使用（與應用設定一致）
+EXPOSE 5001
 
 # 啟動應用程式
 # host=0.0.0.0 是讓容器外部 (您的瀏覽器) 可以連線的關鍵
