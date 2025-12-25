@@ -278,8 +278,20 @@
         <!-- 課程選擇區 -->
         <div class="card">
             <h2>📋 課程列表</h2>
-            <button class="btn btn-primary" onclick="loadCourses()">讀取課程</button>
+            <div class="form-group" style="display:flex; gap:12px; align-items:center;">
+                <label>顯示範圍</label>
+                <div class="btn-group">
+                    <button class="btn" id="roleTeacher" onclick="setRole('teacher')">我擔任教師</button>
+                    <button class="btn" id="roleStudent" onclick="setRole('student')">我擔任學生</button>
+                    <button class="btn" id="roleAll" onclick="setRole('all')">全部課程</button>
+                </div>
+                <button class="btn btn-primary" onclick="loadCourses()">讀取課程</button>
+                <button class="btn btn-success" onclick="loadAllStudentsTabs()">載入所有課室名單</button>
+                <button class="btn btn-success" onclick="exportAllStudents()">導出所有名單（單一工作簿）</button>
+            </div>
             <div id="courseList"></div>
+            <div id="tabs" style="margin-top: 16px;"></div>
+            <div id="tabContents"></div>
         </div>
 
         <!-- 學生管理區 -->
@@ -304,6 +316,12 @@
                 <input type="text" id="topicPrefix" value="Week" placeholder="例如: Week, 第幾週">
             </div>
             <button class="btn btn-primary" onclick="createTopics()">建立主題</button>
+            <hr>
+            <div class="form-group">
+                <label>或使用 CSV 導入主題（第一欄為主題名稱）</label>
+                <input type="file" id="topicCsv" accept=".csv">
+            </div>
+            <button class="btn btn-success" onclick="importTopicsFromCSV()">從 CSV 導入主題</button>
         </div>
 
         <!-- 課件發布區 -->
@@ -354,6 +372,45 @@
             <div id="submissionStats" class="stats-grid"></div>
         </div>
 
+        <!-- 作業發布區 -->
+        <div class="card" id="assignmentSection" style="display: none;">
+            <h2>📝 發布作業</h2>
+            <div class="form-group">
+                <label>作業標題</label>
+                <input type="text" id="assignmentTitle" placeholder="例如：第 1 週作業">
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="assignmentDescription" rows="3" placeholder="作業說明..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>滿分（選填）</label>
+                <input type="number" id="assignmentMaxPoints" min="0" step="1" placeholder="例如：100">
+            </div>
+            <div class="form-group">
+                <label>到期日（選填）</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="number" id="dueYear" placeholder="年" min="2020" style="width:100px;">
+                    <input type="number" id="dueMonth" placeholder="月" min="1" max="12" style="width:80px;">
+                    <input type="number" id="dueDay" placeholder="日" min="1" max="31" style="width:80px;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>選擇主題（選填）</label>
+                <select id="assignmentTopic">
+                    <option value="">無主題</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>發布狀態</label>
+                <select id="assignmentState">
+                    <option value="PUBLISHED">立即發布</option>
+                    <option value="DRAFT">儲存草稿</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="publishAssignment()">發布作業</button>
+        </div>
+
         <div class="loading" id="loadingIndicator">
             <div class="spinner"></div>
             <p style="margin-top: 10px; color: white;">處理中，請稍候...</p>
@@ -399,7 +456,7 @@
                     const data = await resp.json();
                     if (data.status === 'success' && data.authorization_url) {
                         showMessage('👉 正在開啟 Google 授權頁面...');
-                        window.open(data.authorization_url, '_blank');
+                        window.location.href = data.authorization_url;
                     } else {
                         showMessage('❌ ' + (data.message || '取得授權網址失敗'));
                     }
@@ -410,10 +467,22 @@
                 }
             }
 
+        let currentRole = 'teacher';
+        function setRole(role) {
+            currentRole = role;
+            ['roleTeacher','roleStudent','roleAll'].forEach(id => document.getElementById(id).classList.remove('btn-primary'));
+            if (role === 'teacher') document.getElementById('roleTeacher').classList.add('btn-primary');
+            else if (role === 'student') document.getElementById('roleStudent').classList.add('btn-primary');
+            else document.getElementById('roleAll').classList.add('btn-primary');
+        }
+        setRole('teacher');
+
         async function loadCourses() {
             showLoading(true);
             try {
-                const response = await fetch('/api/classroom/courses');
+                const role = currentRole;
+                const url = role === 'all' ? '/api/classroom/courses' : `/api/classroom/courses?role=${role}`;
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.status === 'success') {
@@ -432,7 +501,7 @@
                         courseList.appendChild(div);
                     });
                     
-                    showMessage(`已載入 ${data.count} 個課程`, 'success');
+                    showMessage(`已載入 ${data.count} 個課程（${data.role || role}）`, 'success');
                 } else {
                     showMessage(data.message, 'error');
                 }
@@ -440,6 +509,74 @@
                 showMessage('載入課程失敗: ' + error.message, 'error');
             } finally {
                 showLoading(false);
+            }
+        }
+
+        async function loadAllStudentsTabs() {
+            showLoading(true);
+            try {
+                const role = currentRole;
+                const url = role === 'all' ? '/api/classroom/courses' : `/api/classroom/courses?role=${role}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.status !== 'success') {
+                    showMessage(data.message || '載入課程失敗', 'error');
+                    return;
+                }
+                const courses = data.courses;
+                const tabs = document.getElementById('tabs');
+                const contents = document.getElementById('tabContents');
+                tabs.innerHTML = '';
+                contents.innerHTML = '';
+                let first = true;
+                for (const course of courses) {
+                    const tab = document.createElement('button');
+                    tab.className = 'btn';
+                    tab.textContent = course.name;
+                    tab.onclick = () => {
+                        document.querySelectorAll('#tabContents > div').forEach(d => d.style.display = 'none');
+                        document.getElementById('tab-'+course.id).style.display = 'block';
+                    };
+                    tabs.appendChild(tab);
+
+                    const panel = document.createElement('div');
+                    panel.id = 'tab-'+course.id;
+                    panel.style.display = first ? 'block' : 'none';
+                    panel.innerHTML = `<h3>${course.name}</h3><div class="students"></div>`;
+                    contents.appendChild(panel);
+
+                    const resStu = await fetch(`/api/classroom/students/${course.id}`);
+                    const dataStu = await resStu.json();
+                    if (dataStu.status === 'success') {
+                        const studentsDiv = panel.querySelector('.students');
+                        studentsDiv.innerHTML = '';
+                        dataStu.students.forEach(s => {
+                            const div = document.createElement('div');
+                            div.style.padding = '8px';
+                            div.style.borderBottom = '1px solid #eee';
+                            div.innerHTML = `<strong>${s.profile.name}</strong><br><small>${s.profile.emailAddress}</small>`;
+                            studentsDiv.appendChild(div);
+                        });
+                    } else {
+                        panel.querySelector('.students').innerHTML = `<p class='error'>${dataStu.message || '讀取學生失敗'}</p>`;
+                    }
+                    first = false;
+                }
+                showMessage(`已載入 ${courses.length} 個課室的名單`, 'success');
+            } catch (e) {
+                showMessage('載入名單失敗: ' + e.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function exportAllStudents() {
+            try {
+                const role = currentRole;
+                const url = role === 'all' ? '/api/classroom/students/export_all' : `/api/classroom/students/export_all?role=${role}`;
+                window.location.href = url;
+            } catch (e) {
+                showMessage('導出失敗: ' + e.message, 'error');
             }
         }
 
@@ -458,9 +595,12 @@
             document.getElementById('topicSection').style.display = 'block';
             document.getElementById('materialSection').style.display = 'block';
             document.getElementById('submissionSection').style.display = 'block';
+            document.getElementById('assignmentSection').style.display = 'block';
             
             // 載入主題列表供課件選擇
             loadTopics(courseId);
+            // 同步主題至作業選擇
+            syncTopicsToAssignment();
             // 載入作業列表
             loadCoursework(courseId);
             
@@ -562,14 +702,63 @@
                 if (data.status === 'success') {
                     const select = document.getElementById('materialTopic');
                     select.innerHTML = '<option value="">無主題</option>';
+                    const select2 = document.getElementById('assignmentTopic');
+                    select2.innerHTML = '<option value="">無主題</option>';
                     
                     data.topics.forEach(topic => {
                         const option = document.createElement('option');
                         option.value = topic.topicId;
                         option.textContent = topic.name;
                         select.appendChild(option);
+                        const option2 = document.createElement('option');
+                        option2.value = topic.topicId;
+                        option2.textContent = topic.name;
+                        select2.appendChild(option2);
                     });
                 }
+                    function syncTopicsToAssignment() {
+                        const materialSelect = document.getElementById('materialTopic');
+                        const assignmentSelect = document.getElementById('assignmentTopic');
+                        assignmentSelect.innerHTML = materialSelect.innerHTML;
+                    }
+
+                    async function publishAssignment() {
+                        if (!selectedCourseId) {
+                            showMessage('請先選擇課程', 'error');
+                            return;
+                        }
+                        const title = document.getElementById('assignmentTitle').value;
+                        if (!title) { showMessage('請輸入作業標題', 'error'); return; }
+                        const fd = new FormData();
+                        fd.append('course_id', selectedCourseId);
+                        fd.append('title', title);
+                        fd.append('description', document.getElementById('assignmentDescription').value);
+                        fd.append('max_points', document.getElementById('assignmentMaxPoints').value);
+                        fd.append('topic_id', document.getElementById('assignmentTopic').value);
+                        fd.append('state', document.getElementById('assignmentState').value);
+                        fd.append('due_year', document.getElementById('dueYear').value);
+                        fd.append('due_month', document.getElementById('dueMonth').value);
+                        fd.append('due_day', document.getElementById('dueDay').value);
+                        showLoading(true);
+                        try {
+                            const resp = await fetch('/api/classroom/assignment/create', { method: 'POST', body: fd });
+                            const data = await resp.json();
+                            showMessage(data.message, data.status);
+                            if (data.status === 'success') {
+                                document.getElementById('assignmentTitle').value = '';
+                                document.getElementById('assignmentDescription').value = '';
+                                document.getElementById('assignmentMaxPoints').value = '';
+                                document.getElementById('dueYear').value = '';
+                                document.getElementById('dueMonth').value = '';
+                                document.getElementById('dueDay').value = '';
+                                loadCoursework(selectedCourseId);
+                            }
+                        } catch (e) {
+                            showMessage('發布作業失敗: ' + e.message, 'error');
+                        } finally {
+                            showLoading(false);
+                        }
+                    }
             } catch (error) {
                 console.error('載入主題失敗:', error);
             }
@@ -587,21 +776,23 @@
                 return;
             }
             
-            const formData = {
-                course_id: selectedCourseId,
-                title: title,
-                description: document.getElementById('materialDescription').value,
-                topic_id: document.getElementById('materialTopic').value,
-                link_url: document.getElementById('materialLink').value,
-                state: document.getElementById('materialState').value
-            };
+            const fd = new FormData();
+            fd.append('course_id', selectedCourseId);
+            fd.append('title', title);
+            fd.append('description', document.getElementById('materialDescription').value);
+            fd.append('topic_id', document.getElementById('materialTopic').value);
+            fd.append('link_url', document.getElementById('materialLink').value);
+            fd.append('state', document.getElementById('materialState').value);
+            const fileInput = document.getElementById('materialFile');
+            if (fileInput.files && fileInput.files[0]) {
+                fd.append('file', fileInput.files[0]);
+            }
             
             showLoading(true);
             try {
                 const response = await fetch('/api/classroom/material/create', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
+                    body: fd
                 });
                 const data = await response.json();
                 showMessage(data.message, data.status);
@@ -614,6 +805,35 @@
                 }
             } catch (error) {
                 showMessage('發布課件失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // CSV 導入主題
+        async function importTopicsFromCSV() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            const fileInput = document.getElementById('topicCsv');
+            if (!fileInput.files || !fileInput.files[0]) {
+                showMessage('請選擇 CSV 檔案', 'error');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('course_id', selectedCourseId);
+            fd.append('file', fileInput.files[0]);
+            showLoading(true);
+            try {
+                const resp = await fetch('/api/classroom/topics/import', { method: 'POST', body: fd });
+                const data = await resp.json();
+                showMessage(data.message, data.status);
+                if (data.status === 'success') {
+                    loadTopics(selectedCourseId);
+                }
+            } catch (e) {
+                showMessage('導入主題失敗: ' + e.message, 'error');
             } finally {
                 showLoading(false);
             }

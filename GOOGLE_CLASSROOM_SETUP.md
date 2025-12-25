@@ -32,9 +32,19 @@
 2. 點擊「建立憑證」→「OAuth 2.0 用戶端 ID」
 3. 應用程式類型選擇「網頁應用程式」
 4. 名稱: Project Synapse Web
-5. 在「已授權的重新導向 URI（Authorized redirect URIs）」新增：
+5. 在「已授權的 JavaScript 來源（Authorized JavaScript origins）」新增：
+   - `http://localhost:5001`
+6. 在「已授權的重新導向 URI（Authorized redirect URIs）」新增：
    - `http://localhost:5001/api/classroom/auth/callback`
-6. 建立後下載 JSON 檔案
+7. 建立後下載 JSON 檔案
+
+### 開發模式（HTTP 回調）
+
+本地開發使用 `http://localhost:5001` 回調可能出現 `OAuth 2 MUST utilize https`。
+請在開發模式下啟用下列環境變數或使用 HTTPS 代理：
+
+- 選項 A：在 `.env` 新增 `OAUTHLIB_INSECURE_TRANSPORT=1`
+- 選項 B：使用 ngrok/Cloudflare Tunnel 提供 HTTPS（例如 `https://<your-subdomain>.ngrok.io/api/classroom/auth/callback`），並將此 URL 加入回調清單
 
 ## 步驟 4: 將憑證放置到專案中
 

@@ -148,6 +148,157 @@ class GoogleClassroomIntegration:
         except Exception as e:
             print(f"❌ 獲取課程列表失敗: {e}")
             return []
+
+    def get_my_courses(self, role: str = 'teacher') -> List[Dict]:
+        """
+        只列出與目前帳號相關的課程
+
+        Args:
+            role: 'teacher' 或 'student'
+
+        Returns:
+            List[Dict]: 課程資訊列表
+        """
+        try:
+            kwargs = {
+                'pageSize': 100,
+                'courseStates': ['ACTIVE']
+            }
+            if role == 'teacher':
+                kwargs['teacherId'] = 'me'
+            elif role == 'student':
+                kwargs['studentId'] = 'me'
+
+            results = self.classroom_service.courses().list(**kwargs).execute()
+            courses = results.get('courses', [])
+
+            return [{
+                'id': course['id'],
+                'name': course['name'],
+                'section': course.get('section', ''),
+                'descriptionHeading': course.get('descriptionHeading', ''),
+                'room': course.get('room', ''),
+                'ownerId': course['ownerId'],
+                'creationTime': course['creationTime'],
+                'updateTime': course['updateTime'],
+                'enrollmentCode': course.get('enrollmentCode', ''),
+                'courseState': course['courseState'],
+                'alternateLink': course['alternateLink']
+            } for course in courses]
+        except Exception as e:
+            print(f"❌ 獲取我的課程列表失敗: {e}")
+            return []
+
+    def export_all_students_to_excel(self, courses: List[Dict], filename: str = 'all_students') -> str:
+        """
+        將多個課程的學生名單導出至同一個 Excel 檔案（多工作表）
+
+        Args:
+            courses: 課程列表，需包含 'id' 與 'name'
+            filename: 輸出檔名（不含副檔名）
+
+        Returns:
+            str: 生成的 Excel 檔案路徑
+        """
+        try:
+            output_path = f"/tmp/{filename}.xlsx"
+            with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+                for course in courses:
+                    course_id = course['id']
+                    course_name = course.get('name', f"course_{course_id}")
+                    # 讀取學生名單
+                    results = self.classroom_service.courses().students().list(
+                        courseId=course_id,
+                        pageSize=200
+                    ).execute()
+                    students = results.get('students', [])
+                    rows = []
+                    for s in students:
+                        profile = s.get('profile', {})
+                        rows.append({
+                            'Name': profile.get('name', ''),
+                            'Email': profile.get('emailAddress', ''),
+                            'UserId': profile.get('id', ''),
+                        })
+                    df = pd.DataFrame(rows)
+                    if df.empty:
+                        df = pd.DataFrame([{'Name': '', 'Email': '', 'UserId': ''}])
+                    # 工作表名稱避免過長
+                    sheet_name = course_name[:31]
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    # 調整欄寬
+                    worksheet = writer.sheets[sheet_name]
+                    worksheet.set_column('A:A', 24)
+                    worksheet.set_column('B:B', 30)
+                    worksheet.set_column('C:C', 24)
+            return output_path
+        except Exception as e:
+            print(f"❌ 導出所有學生名單失敗: {e}")
+            return ""
+
+    def create_topics_from_names(self, course_id: str, names: List[str]) -> List[Dict]:
+        """
+        依照提供的名稱清單建立主題
+
+        Args:
+            course_id: 課程 ID
+            names: 主題名稱列表
+
+        Returns:
+            List[Dict]: 建立後的主題資訊
+        """
+        try:
+            created = []
+            for name in names:
+                body = {"name": name}
+                topic = self.classroom_service.courses().topics().create(
+                    courseId=course_id,
+                    body=body
+                ).execute()
+                created.append(topic)
+            return created
+        except Exception as e:
+            print(f"❌ 依名稱建立主題失敗: {e}")
+            return []
+
+    def create_assignment(self, course_id: str, title: str, description: str = "", max_points: Optional[int] = None,
+                           due_date: Optional[Dict] = None, topic_id: Optional[str] = None, state: str = 'PUBLISHED') -> Optional[Dict]:
+        """
+        建立作業（CourseWork）
+
+        Args:
+            course_id: 課程 ID
+            title: 作業標題
+            description: 作業描述
+            max_points: 滿分
+            due_date: 到期日，格式例如 {"year":2025,"month":1,"day":15}
+            topic_id: 主題 ID（選填）
+            state: 狀態 'PUBLISHED' 或 'DRAFT'
+
+        Returns:
+            Optional[Dict]: 建立的作業物件
+        """
+        try:
+            body = {
+                "title": title,
+                "description": description,
+                "workType": "ASSIGNMENT",
+                "state": state
+            }
+            if max_points is not None:
+                body["maxPoints"] = int(max_points)
+            if due_date:
+                body["dueDate"] = due_date
+            if topic_id:
+                body["topicId"] = topic_id
+            coursework = self.classroom_service.courses().courseWork().create(
+                courseId=course_id,
+                body=body
+            ).execute()
+            return coursework
+        except Exception as e:
+            print(f"❌ 建立作業失敗: {e}")
+            return None
     
     def get_students(self, course_id: str) -> List[Dict]:
         """
