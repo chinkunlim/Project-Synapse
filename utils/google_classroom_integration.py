@@ -12,7 +12,7 @@ from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 import pandas as pd
@@ -29,6 +29,7 @@ class GoogleClassroomIntegration:
         'https://www.googleapis.com/auth/classroom.topics',
         'https://www.googleapis.com/auth/classroom.courseworkmaterials',
         'https://www.googleapis.com/auth/classroom.coursework.me',
+        'https://www.googleapis.com/auth/classroom.coursework.students',
         'https://www.googleapis.com/auth/drive.file'
     ]
     
@@ -45,6 +46,23 @@ class GoogleClassroomIntegration:
         self.classroom_service = None
         self.drive_service = None
         
+        # 嘗試自動載入 Token
+        self._try_load_token()
+        
+    def _try_load_token(self):
+        """嘗試從檔案載入 Token"""
+        try:
+            if self.token_path.exists():
+                with open(self.token_path, 'rb') as token:
+                    self.creds = pickle.load(token)
+                
+                if self.creds and self.creds.valid:
+                    self.classroom_service = build('classroom', 'v1', credentials=self.creds)
+                    self.drive_service = build('drive', 'v3', credentials=self.creds)
+                    print("✅ Google Classroom Token 載入成功")
+        except Exception as e:
+            print(f"⚠️ Token 載入失敗: {e}")
+
     def authenticate(self) -> bool:
         """
         執行 OAuth 2.0 認證流程
@@ -90,6 +108,22 @@ class GoogleClassroomIntegration:
             print(f"❌ 認證失敗: {e}")
             return False
 
+    def get_oauth_flow(self, redirect_uri: str = None) -> Flow:
+        """
+        建立 Web OAuth Flow 物件
+        
+        Args:
+            redirect_uri: 回調網址
+        """
+        if not self.credentials_path.exists():
+            raise FileNotFoundError(f"Credential file not found: {self.credentials_path}")
+            
+        return Flow.from_client_secrets_file(
+            str(self.credentials_path),
+            scopes=self.SCOPES,
+            redirect_uri=redirect_uri
+        )
+
     def set_credentials(self, creds: Credentials) -> bool:
         """
         以既有的 Credentials 完成整合初始化，並持久化憑證
@@ -117,14 +151,17 @@ class GoogleClassroomIntegration:
             print(f"❌ 初始化憑證失敗: {e}")
             return False
     
-    def get_courses(self) -> List[Dict]:
+    def get_courses(self) -> Optional[List[Dict]]:
         """
         獲取所有課程列表
         
         Returns:
-            List[Dict]: 課程資訊列表，包含 id, name, section 等
+            List[Dict]: 課程資訊列表，包含 id, name, section 等。若未認證返回 None。
         """
         try:
+            if not self.classroom_service:
+                return None
+
             results = self.classroom_service.courses().list(
                 pageSize=100,
                 courseStates=['ACTIVE']
@@ -150,7 +187,7 @@ class GoogleClassroomIntegration:
             print(f"❌ 獲取課程列表失敗: {e}")
             return []
 
-    def get_my_courses(self, role: str = 'teacher') -> List[Dict]:
+    def get_my_courses(self, role: str = 'teacher') -> Optional[List[Dict]]:
         """
         只列出與目前帳號相關的課程
 
@@ -158,9 +195,12 @@ class GoogleClassroomIntegration:
             role: 'teacher' 或 'student'
 
         Returns:
-            List[Dict]: 課程資訊列表
+            List[Dict]: 課程資訊列表。若未認證返回 None。
         """
         try:
+            if not self.classroom_service:
+                return None
+
             kwargs = {
                 'pageSize': 100,
                 'courseStates': ['ACTIVE']
@@ -188,6 +228,17 @@ class GoogleClassroomIntegration:
             } for course in courses]
         except Exception as e:
             print(f"❌ 獲取我的課程列表失敗: {e}")
+            return []
+
+    def get_grade_categories(self, course_id: str) -> List[Dict]:
+        """
+        獲取課程的成績類別
+        """
+        try:
+            course = self.classroom_service.courses().get(id=course_id).execute()
+            return course.get('gradeCategories', [])
+        except Exception as e:
+            print(f"❌ 獲取成績類別失敗: {e}")
             return []
 
     def export_all_students_to_excel(self, courses: List[Dict], filename: str = 'all_students') -> str:
@@ -481,14 +532,75 @@ class GoogleClassroomIntegration:
             print(f"❌ 獲取主題列表失敗: {e}")
             return []
     
-    def upload_file_to_drive(self, file_path: str, file_name: str = None) -> Optional[str]:
+    def _find_or_create_folder(self, folder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
+        """
+        在指定父資料夾中搜尋資料夾，若不存在則建立
+
+        Args:
+            folder_name: 資料夾名稱
+            parent_id: 父資料夾 ID（若為 None 則為根目錄）
+
+        Returns:
+            str: 資料夾 ID
+        """
+        try:
+            q = f"mimeType='application/vnd.google-apps.folder' and name='{folder_name}' and trashed=false"
+            if parent_id:
+                q += f" and '{parent_id}' in parents"
+            
+            results = self.drive_service.files().list(q=q, fields="files(id)").execute()
+            files = results.get('files', [])
+            
+            if files:
+                return files[0]['id']
+            
+            # create
+            metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder'
+            }
+            if parent_id:
+                metadata['parents'] = [parent_id]
+                
+            folder = self.drive_service.files().create(body=metadata, fields='id').execute()
+            return folder.get('id')
+            
+        except Exception as e:
+            print(f"❌ 尋找/建立資料夾失敗 ({folder_name}): {e}")
+            return None
+
+    def ensure_course_folder_structure(self, course_name: str, subfolder: str) -> Optional[str]:
+        """
+        確保 Drive 中存在 Classroom/<Course>/<Subfolder> 結構
+
+        Args:
+            course_name: 課程名稱
+            subfolder: 子資料夾名稱 (Materials 或 Assignments)
+
+        Returns:
+            str: 目標資料夾 ID
+        """
+        # 1. Ensure 'Classroom' root folder
+        classroom_id = self._find_or_create_folder("Classroom")
+        if not classroom_id: return None
+        
+        # 2. Ensure Course folder
+        course_folder_id = self._find_or_create_folder(course_name, parent_id=classroom_id)
+        if not course_folder_id: return None
+        
+        # 3. Ensure Target Subfolder
+        target_id = self._find_or_create_folder(subfolder, parent_id=course_folder_id)
+        return target_id
+
+    def upload_file_to_drive(self, file_path: str, file_name: str = None, parent_id: str = None) -> Optional[str]:
         """
         上傳檔案到 Google Drive
-        
+
         Args:
             file_path: 本地檔案路徑
-            file_name: Drive 中的檔案名稱（若未提供則使用原檔名）
-            
+            file_name: Drive 中的檔案名稱
+            parent_id: 指定上傳到的資料夾 ID
+
         Returns:
             Optional[str]: Drive 檔案 ID，失敗返回 None
         """
@@ -497,6 +609,9 @@ class GoogleClassroomIntegration:
                 file_name = Path(file_path).name
 
             file_metadata = {'name': file_name}
+            if parent_id:
+                file_metadata['parents'] = [parent_id]
+                
             media = MediaFileUpload(file_path, resumable=True)
 
             file = self.drive_service.files().create(
@@ -684,23 +799,122 @@ class GoogleClassroomIntegration:
                 pageSize=100
             ).execute()
             
-            coursework_list = results.get('courseWork', [])
-            
-            return [{
-                'id': work['id'],
-                'courseId': work['courseId'],
-                'title': work['title'],
-                'description': work.get('description', ''),
-                'state': work['state'],
-                'alternateLink': work['alternateLink'],
-                'creationTime': work['creationTime'],
-                'updateTime': work['updateTime'],
-                'dueDate': work.get('dueDate'),
-                'dueTime': work.get('dueTime'),
-                'maxPoints': work.get('maxPoints'),
-                'workType': work['workType']
-            } for work in coursework_list]
+            return results.get('courseWork', [])
             
         except Exception as e:
             print(f"❌ 獲取作業列表失敗: {e}")
             return []
+
+    def get_course_full_view(self, course_id: str) -> Dict:
+        """
+        Aggregate all data for a course dashboard using Google Batch API.
+        Step 1: Batch fetch Metadata (Students, Topics, CourseInfo, CourseWork).
+        Step 2: Batch fetch Stats for the retrieved CourseWork.
+        """
+        from googleapiclient.http import BatchHttpRequest
+
+        data = {
+            "students": [], "topics": [], "gradeCategories": [], 
+            "coursework": [], "stats": {}
+        }
+        
+        if not self.classroom_service: return data
+
+        # --- Step 1: Metadata Batch ---
+        def cb_students(request_id, response, exception):
+            if exception: print(f"Error fetching students: {exception}")
+            else: 
+                data["students"] = [{
+                    'courseId': s['courseId'], 'userId': s['userId'],
+                    'profile': {
+                        'id': s['profile']['id'],
+                        'name': s['profile']['name']['fullName'],
+                        'emailAddress': s['profile'].get('emailAddress', ''),
+                        'photoUrl': s['profile'].get('photoUrl', '')
+                    }
+                } for s in response.get('students', [])]
+
+        def cb_topics(request_id, response, exception):
+            if exception: print(f"Error fetching topics: {exception}")
+            else: 
+                data["topics"] = [{
+                    'topicId': t['topicId'], 'name': t['name'],
+                    'courseId': t['courseId'], 'updateTime': t['updateTime']
+                } for t in response.get('topic', [])]
+
+        def cb_course(request_id, response, exception):
+            if exception: print(f"Error fetching course info: {exception}")
+            else: data["gradeCategories"] = response.get('gradeCategories', [])
+
+        def cb_coursework(request_id, response, exception):
+            if exception: print(f"Error fetching coursework: {exception}")
+            else: 
+                data["coursework"] = [{
+                    'id': w['id'], 'courseId': w['courseId'], 'title': w['title'],
+                    'description': w.get('description', ''), 'state': w['state'],
+                    'alternateLink': w['alternateLink'], 'creationTime': w['creationTime'],
+                    'updateTime': w['updateTime'], 'dueDate': w.get('dueDate'),
+                    'dueTime': w.get('dueTime'), 'maxPoints': w.get('maxPoints'),
+                    'workType': w['workType']
+                } for w in response.get('courseWork', [])]
+
+        batch1 = self.classroom_service.new_batch_http_request()
+        
+        # Add requests to Batch 1
+        batch1.add(self.classroom_service.courses().students().list(courseId=course_id, pageSize=100), callback=cb_students)
+        batch1.add(self.classroom_service.courses().topics().list(courseId=course_id, pageSize=100), callback=cb_topics)
+        batch1.add(self.classroom_service.courses().get(id=course_id), callback=cb_course)
+        batch1.add(self.classroom_service.courses().courseWork().list(courseId=course_id, pageSize=100), callback=cb_coursework)
+        
+        try:
+            batch1.execute()
+        except Exception as e:
+            print(f"Batch 1 execution failed: {e}")
+            return data
+
+        # --- Step 2: Stats Batch (Dependent on CourseWork) ---
+        if not data["coursework"]: return data
+
+        submission_stats = {}
+        
+        def cb_stats(request_id, response, exception):
+            if exception:
+                submission_stats[request_id] = {'error': str(exception)}
+            else:
+                subs = response.get('studentSubmissions', [])
+                total = len(subs)
+                stats = {'total': total, 'turned_in': 0, 'new': 0, 'created': 0, 
+                         'reclaimed_by_student': 0, 'returned': 0, 'late': 0}
+                
+                for s in subs:
+                    state = s.get('state', 'NEW').lower()
+                    stats[state] = stats.get(state, 0) + 1
+                    if s.get('late'): stats['late'] += 1
+                
+                if total > 0:
+                    stats['turned_in_percentage'] = round(stats['turned_in'] / total * 100, 2)
+                else:
+                    stats['turned_in_percentage'] = 0
+                
+                submission_stats[request_id] = stats
+
+        batch2 = self.classroom_service.new_batch_http_request(callback=cb_stats)
+        
+        for cw in data["coursework"]:
+            batch2.add(
+                self.classroom_service.courses().courseWork().studentSubmissions().list(
+                    courseId=course_id, 
+                    courseWorkId=cw['id'], 
+                    pageSize=100
+                ), 
+                request_id=cw['id']
+            )
+        
+        try:
+            batch2.execute()
+            data["stats"] = submission_stats
+        except Exception as e:
+            print(f"Batch 2 execution failed: {e}")
+
+        return data
+

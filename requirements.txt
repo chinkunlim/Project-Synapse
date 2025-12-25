@@ -12,3 +12,4 @@ tqdm==4.67.1
 pandas
 openpyxl
 xlsxwriter
+Markdown

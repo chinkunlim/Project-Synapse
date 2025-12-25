@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation | Project Synapse{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-5 border-bottom pb-3">
+    <div>
+        <h2 class="fw-bold text-primary mb-1 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-book-open"></i> Documentation <span class="fs-4 text-muted fw-normal">文檔中心</span>
+        </h2>
+        <p class="text-muted mb-0">User Manual & Developer Guide / 使用說明與開發指南</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom pt-4 pb-2">
+                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-list text-secondary me-2"></i> Contents <span
+                        class="fs-6 text-muted fw-normal ms-1">目錄</span></h5>
+            </div>
+            <div class="card-body p-2">
+                <div class="nav flex-column nav-pills gap-1" id="docs-sidebar">
+                    {% for doc in docs %}
+                    <a href="/docs?file={{ doc.filename }}"
+                        class="nav-link text-truncate {{ 'active bg-info shadow-sm fw-bold' if current_file == doc.filename else 'text-dark opacity-75' }} rounded-3 px-3 py-2 d-flex align-items-center">
+                        <i class="fa-regular fa-file-lines me-2"></i>{{ doc.title }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <div class="card shadow-sm border-0" style="min-height: 80vh;">
+            <div class="card-body p-5">
+                {% if content %}
+                <div class="markdown-body">
+                    {{ content | safe }}
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted opacity-50">
+                    <i class="fa-regular fa-folder-open fa-3x mb-3"></i>
+                    <h5 class="fw-light">Select a document to read. / 請選擇文件以開始閱讀。</h5>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+    /* Minimal Markdown Styling */
+    .markdown-body {
+        font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        line-height: 1.8;
+        color: var(--text-primary);
+    }
+
+    .markdown-body h1 {
+        font-weight: 800;
+        margin-bottom: 1rem;
+        color: var(--bs-primary);
+    }
+
+    .markdown-body h2 {
+        font-weight: 700;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+    }
+
+    .markdown-body h3 {
+        font-weight: 600;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .markdown-body code {
+        background-color: var(--bg-surface-sec);
+        color: var(--bs-danger);
+        border-radius: 4px;
+        padding: 0.2rem 0.4rem;
+        font-family: 'Courier New', monospace;
+    }
+
+    .markdown-body pre {
+        background-color: var(--bg-surface-sec);
+        padding: 1.5rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin-bottom: 1.5rem;
+    }
+
+    .markdown-body pre code {
+        background-color: transparent;
+        color: inherit;
+        padding: 0;
+    }
+
+    .markdown-body blockquote {
+        border-left: 4px solid var(--bs-info);
+        background-color: var(--bg-surface-sec);
+        padding: 1rem;
+        border-radius: 0 8px 8px 0;
+        margin: 1.5rem 0;
+        color: var(--text-muted);
+    }
+
+    .markdown-body ul,
+    .markdown-body ol {
+        padding-left: 2rem;
+    }
+
+    .markdown-body li {
+        margin-bottom: 0.5rem;
+    }
+
+    .markdown-body img {
+        max-width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        margin: 1.5rem 0;
+    }
+</style>
+{% endblock %}

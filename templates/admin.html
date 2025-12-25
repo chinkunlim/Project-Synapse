@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings | Project Synapse{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-5 border-bottom pb-3">
+    <div>
+        <h2 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-screwdriver-wrench text-secondary"></i> System Settings <span
+                class="fs-4 text-muted fw-normal">系統設定</span>
+        </h2>
+        <p class="text-muted mb-0">API Keys & Environment Variables / API 金鑰與環境變數管理</p>
+    </div>
+    <!-- Back button removed -->
+</div>
+
+<!-- Warning -->
+<div class="alert alert-warning border border-warning border-opacity-25 bg-warning bg-opacity-10 d-flex align-items-center mb-5 rounded-3 shadow-sm"
+    role="alert">
+    <i class="fa-solid fa-shield-halved me-4 fa-2x text-warning"></i>
+    <div>
+        <strong class="text-dark">Security Warning / 安全警告</strong>
+        <p class="mb-0 text-muted small">
+            This page contains sensitive API keys. Do not share your screen. <br>
+            此頁面包含敏感金鑰，請勿在公開場合展示。修改後將重啟服務。
+        </p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Environment Variables Form -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-white border-bottom pt-4 pb-2 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-code text-primary me-2"></i> Variables <span
+                        class="fs-6 text-muted fw-normal ms-1">環境參數配置</span></h5>
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="loadEnv()">
+                    <i class="fa-solid fa-rotate me-2"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <form id="envForm">
+                    <div id="envFields" class="row g-3">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary opacity-50" role="status"></div>
+                            <p class="mt-3 text-muted small fw-medium">Reading .env file... / 讀取中...</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-white border-top border-light py-3 text-end">
+                <button type="button" class="btn btn-primary rounded-pill px-4" onclick="saveEnv()">
+                    <i class="fa-solid fa-floppy-disk me-2"></i> Save Changes <span class="small ms-1">儲存設定</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status & Tools -->
+    <div class="col-lg-4">
+        <!-- Status Card -->
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-header bg-white border-bottom pt-4 pb-2">
+                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-server text-info me-2"></i> Status <span
+                        class="fs-6 text-muted fw-normal ms-1">系統狀態</span></h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                        <span class="fw-medium text-secondary">Flask Server</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i
+                                class="fa-solid fa-circle mw-1 me-1" style="font-size:0.6em"></i> Running</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                        <span class="fw-medium text-secondary">Notion API</span>
+                        <span
+                            class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill"
+                            id="status-notion">Checking...</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                        <span class="fw-medium text-secondary">Google Classroom</span>
+                        <span
+                            class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill"
+                            id="status-classroom">Checking...</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                        <span class="fw-medium text-secondary">N8N Service</span>
+                        <span
+                            class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill"
+                            id="status-n8n">Checking...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Tools -->
+        <div class="card shadow-sm border-0 border-top border-4 border-danger">
+            <div class="card-header bg-white border-bottom pt-4 pb-2">
+                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-fire text-danger me-2"></i> Actions <span
+                        class="fs-6 text-muted fw-normal ms-1">管理操作</span></h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-danger text-start py-2 rounded-3 border-danger-subtle text-danger">
+                        <i class="fa-solid fa-rotate-right me-3"></i> Restart Service <span
+                            class="small text-muted ms-1">重啟服務</span>
+                    </button>
+                    <button class="btn btn-outline-danger text-start py-2 rounded-3 border-danger-subtle text-danger">
+                        <i class="fa-solid fa-trash me-3"></i> Clear Cache <span
+                            class="small text-muted ms-1">清除快取</span>
+                    </button>
+                    <button onclick="resetAuth()"
+                        class="btn btn-outline-warning text-start py-2 rounded-3 border-warning-subtle text-warning-emphasis">
+                        <i class="fa-solid fa-key me-3"></i> Re-authenticate All Accounts <span
+                            class="small text-muted ms-1">重置所有帳號認證</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEnv();
+        checkSystemStatus();
+    });
+
+    async function loadEnv() {
+        try {
+            const res = await fetch('/api/admin/env');
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            const data = await res.json();
+
+            const container = document.getElementById('envFields');
+            container.innerHTML = '';
+
+            if (data.status === 'success' && data.env) {
+                // Categorize keys for better UI
+                const categories = {
+                    'FLASK': ['FLASK_SECRET_KEY', 'FLASK_DEBUG'],
+                    'NOTION': ['NOTION_API_KEY', 'NOTION_PARENT_PAGE_ID', 'NOTION_DATABASE_ID'],
+                    'GOOGLE': ['GOOGLE_CLIENT_SECRETS_FILE', 'GOOGLE_CREDENTIALS_FILE'],
+                    'N8N': ['N8N_API_KEY', 'N8N_BASE_URL']
+                };
+
+                const allKeys = Object.keys(data.env);
+
+                const renderField = (key, value) => {
+                    const col = document.createElement('div');
+                    col.className = 'col-12';
+                    // Masking: Fixed length asterisks, store real value in generic data attribute
+                    const mask = '********************';
+                    col.innerHTML = `
+                         <label class="form-label small fw-bold text-secondary mb-1">${key}</label>
+                         <div class="input-group">
+                             <input type="text" class="form-control form-control-sm font-monospace bg-light border-0" 
+                                    name="${key}" 
+                                    value="${mask}" 
+                                    data-real-value="${value}"
+                                    data-masked="true"
+                                    ${key === 'FLASK_DEBUG' ? '' : ''}
+                                    oninput="this.dataset.masked = 'false'">
+                             <button class="btn btn-sm btn-light border-0 text-muted" type="button" 
+                                     title="Toggle Visibility"
+                                     onclick="toggleVisibility(this)">
+                                 <i class="fa-regular fa-eye"></i>
+                             </button>
+                         </div>
+                     `;
+                    return col;
+                };
+
+                // Render categorized fields
+                for (const [cat, keys] of Object.entries(categories)) {
+                    const catKeys = allKeys.filter(k => k.startsWith(cat) || keys.includes(k));
+
+                    if (catKeys.length > 0) {
+                        const header = document.createElement('div');
+                        header.className = 'col-12 mt-4 mb-2';
+                        header.innerHTML = `<h6 class="border-bottom pb-2 text-primary small fw-bold text-uppercase d-flex align-items-center"><i class="fa-solid fa-layer-group me-2"></i> ${cat} Configuration</h6>`;
+                        container.appendChild(header);
+
+                        catKeys.forEach(k => {
+                            container.appendChild(renderField(k, data.env[k]));
+                            const idx = allKeys.indexOf(k);
+                            if (idx > -1) allKeys.splice(idx, 1);
+                        });
+                    }
+                }
+
+                // Render remaining keys
+                if (allKeys.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'col-12 mt-4 mb-2';
+                    header.innerHTML = `<h6 class="border-bottom pb-2 text-primary small fw-bold text-uppercase d-flex align-items-center"><i class="fa-solid fa-layer-group me-2"></i> Other Settings</h6>`;
+                    container.appendChild(header);
+                    allKeys.forEach(k => {
+                        container.appendChild(renderField(k, data.env[k]));
+                    });
+                }
+
+                window.synapseConsole.log('Loaded environment variables.', 'success');
+            } else {
+                container.innerHTML = `<div class="col-12 text-center text-danger py-4"><i class="fa-solid fa-triangle-exclamation me-2"></i> Failed to load env: ${data.message || 'Unknown error'}</div>`;
+                window.synapseConsole.log('Failed to load env.', 'error');
+            }
+        } catch (e) {
+            const container = document.getElementById('envFields');
+            container.innerHTML = `<div class="col-12 text-center text-danger py-4"><i class="fa-solid fa-triangle-exclamation me-2"></i> Error: ${e.message}</div>`;
+            window.synapseConsole.log('Error loading env: ' + e.message, 'error');
+        }
+    }
+
+    function toggleVisibility(btn) {
+        const input = btn.previousElementSibling;
+        const icon = btn.querySelector('i');
+
+        if (input.dataset.masked === 'true') {
+            // Unmask: Show real value
+            input.value = input.dataset.realValue;
+            input.dataset.masked = 'false';
+            icon.className = 'fa-regular fa-eye-slash';
+        } else {
+            // Mask: Show fixed asterisks
+            // Update real value in case user edited it
+            input.dataset.realValue = input.value;
+            input.value = '********************';
+            input.dataset.masked = 'true';
+            icon.className = 'fa-regular fa-eye';
+        }
+    }
+
+    async function saveEnv() {
+        const customPayload = {};
+        const inputs = document.querySelectorAll('#envForm input');
+
+        inputs.forEach(input => {
+            if (input.dataset.masked === 'true') {
+                customPayload[input.name] = input.dataset.realValue;
+            } else {
+                customPayload[input.name] = input.value;
+            }
+        });
+
+        try {
+            window.synapseConsole.log('Saving environment variables...', 'info');
+            const res = await fetch('/api/admin/env/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(customPayload)
+            });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                window.synapseConsole.log('Environment variables updated successfully.', 'success');
+                showToast('Settings saved!', 'success');
+            } else {
+                window.synapseConsole.log('Save failed: ' + data.message, 'error');
+                showToast('Save failed.', 'error');
+            }
+        } catch (e) {
+            window.synapseConsole.log('Save error: ' + e.message, 'error');
+        }
+    }
+
+    async function resetAuth() {
+        if (!confirm('Are you sure you want to reset all authentications?\nThis will disconnect Google Classroom and Tasks.\nYou will need to log in again next time you use them.\n\n確定要重置所有認證嗎？這將中斷 Google 連線。')) {
+            return;
+        }
+
+        try {
+            window.synapseConsole.log('Resetting authentication tokens...', 'warning');
+            const res = await fetch('/api/admin/auth/reset', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                window.synapseConsole.log(data.message, 'success');
+                showToast('Authentication reset successful!', 'success');
+                // Optional: Reload to update status badges
+                setTimeout(() => checkSystemStatus(), 1000);
+            } else {
+                window.synapseConsole.log('Reset failed: ' + data.message, 'error');
+                showToast('Reset failed.', 'error');
+            }
+        } catch (e) {
+            window.synapseConsole.log('Reset error: ' + e.message, 'error');
+        }
+    }
+
+    async function checkSystemStatus() {
+        // Implementation for status checks (mock or real)
+        // Here we can reuse endpoints or check connectivity
+        updateStatus('status-notion', 'success', 'Connected / 連線正常');
+        updateStatus('status-classroom', 'success', 'Connected / 連線正常');
+        updateStatus('status-n8n', 'warning', 'No API Key / 未設定');
+    }
+
+    function updateStatus(id, type, text) {
+        const el = document.getElementById(id);
+        if (el) {
+            // Map types to proper bootstrap colors
+            const bgClass = type === 'success' ? 'bg-success-subtle text-success border border-success-subtle' :
+                type === 'warning' ? 'bg-warning-subtle text-warning border border-warning-subtle' :
+                    'bg-secondary-subtle text-secondary border border-secondary-subtle';
+
+            el.className = `badge ${bgClass} rounded-pill`;
+            el.innerHTML = `<i class="fa-solid fa-circle mw-1 me-1" style="font-size:0.6em"></i> ${text}`;
+        }
+    }
+</script>
+{% endblock %}

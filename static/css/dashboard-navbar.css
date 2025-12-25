@@ -1,0 +1,42 @@
+/* Auto-hide Navbar for Dashboard Only */
+body.dashboard-page .navbar {
+    top: -80px;
+    /* Hide by default (height of navbar) */
+    transition: top 0.3s ease-in-out;
+}
+
+body.dashboard-page .navbar:hover {
+    top: 0;
+}
+
+/* Ensure there's a trigger area at the top */
+body.dashboard-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    z-index: 1031;
+    /* Above navbar z-index (1030) usually, but we want it to trigger navbar hover. 
+                      Actually, better approach: make the navbar transparent but present? 
+                      No, user said "hide/show on approach". 
+                      Let's use a trigger zone. */
+}
+
+/* Better approach: Wrapper or JS? 
+   Let's stick to simple CSS using a fixed header area.
+*/
+.hover-trigger {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    z-index: 9999;
+}
+
+.hover-trigger:hover~.navbar,
+.navbar:hover {
+    top: 0 !important;
+}

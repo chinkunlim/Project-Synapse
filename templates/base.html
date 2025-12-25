@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Project Synapse{% endblock %}</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+
+    <!-- Fonts: Inter & Noto Sans TC & FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS (Premium Glass Theme) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- Floating Navbar Container -->
+    <div class="navbar-container">
+        <nav class="navbar navbar-expand-lg">
+            <div class="container-fluid">
+                <!-- Brand -->
+                <a class="navbar-brand" href="/">
+                    <i class="fa-solid fa-brain me-2"></i>SYNAPSE
+                </a>
+
+                <!-- Toggler -->
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarContent">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Nav Links -->
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0 mx-auto gap-1">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                                <i class="fa-solid fa-grip-vertical me-1"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/classroom' %}active{% endif %}"
+                                href="/classroom">
+                                <i class="fa-solid fa-chalkboard-user me-1"></i> Classroom
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/notion' %}active{% endif %}" href="/notion">
+                                <i class="fa-solid fa-shapes me-1"></i> Notion Admin
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/thesis' %}active{% endif %}" href="/thesis">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Thesis
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/n8n' %}active{% endif %}" href="/n8n">
+                                <i class="fa-solid fa-bolt me-1"></i> Automation
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/docs' %}active{% endif %}" href="/docs">
+                                <i class="fa-solid fa-book-open me-1"></i> Docs
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Right Side Settings -->
+                    <ul class="navbar-nav">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fa-solid fa-gear me-1"></i> Admin
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-4 p-2"
+                                style="background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);">
+                                <li><a class="dropdown-item rounded-3 mb-1" href="/admin"><i
+                                            class="fa-solid fa-server me-2 text-danger"></i>System Settings</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content Container (Spacious) -->
+    <main class="container py-4 mb-5" style="max-width: 1200px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-4">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show border-0 shadow-sm rounded-4 d-flex align-items-center"
+                role="alert" style="background: rgba(255,255,255,0.9); backdrop-filter: blur(5px);">
+                <i class="fa-solid fa-circle-info me-3 fs-5 text-{{ category }}"></i>
+                <div>{{ message }}</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer (Simple & Clean) -->
+    <footer class="mt-auto py-4 text-center text-muted small">
+        <div class="container">
+            <p class="mb-1 opacity-75">Project Synapse v3.0 &copy; 2024</p>
+            <p class="mb-0 opacity-50 font-monospace" style="font-size: 0.75em;">Designed with <i
+                    class="fa-solid fa-heart text-danger"></i> and Glassmorphism</p>
+        </div>
+    </footer>
+
+    <!-- Global Console Overlay -->
+    <div id="synapse-console" class="shadow-lg overflow-hidden border-top border-secondary border-opacity-25"
+        style="position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; background: rgba(30,30,30,0.95); backdrop-filter: blur(10px); z-index: 9999; color: #eee; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+
+        <!-- Resize Handle -->
+        <div id="console-resize-handle" class="w-100 position-absolute top-0 start-0 z-3"
+            style="height: 6px; cursor: ns-resize; background: transparent;"></div>
+
+        <!-- Header -->
+        <div id="synapse-console-header"
+            class="d-flex justify-content-between align-items-center px-3 py-2 bg-dark border-bottom border-secondary border-opacity-25 z-2 position-relative"
+            style="cursor: pointer; user-select: none;">
+            <div class="small fw-bold text-success d-flex align-items-center">
+                <i class="fa-solid fa-terminal me-2"></i>Synapse Ops
+                <span class="badge bg-secondary bg-opacity-25 text-light ms-2" style="font-size: 0.6em;">LIVE</span>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <button id="console-clear-btn" class="btn btn-sm btn-link text-secondary p-0 hover-white"
+                    title="Clear Logs">
+                    <i class="fa-solid fa-eraser"></i>
+                </button>
+                <div class="vr bg-secondary opacity-25 mx-1"></div>
+                <button id="console-toggle-btn" class="btn btn-sm btn-link text-white p-0 transition-transform"
+                    title="Minimize">
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div id="synapse-console-body" class="flex-grow-1 p-2 overflow-auto small"
+            style="font-size: 0.8rem; scrollbar-width: thin; scrollbar-color: #555 transparent;">
+            <!-- Logs injected here -->
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Console Logic -->
+    <script src="{{ url_for('static', filename='js/console.js') }}"></script>
+
+    <!-- Global Helper Scripts -->
+    <script>
+        // Simple Toast Helper
+        function showToast(message, type = 'info') {
+            // Log to console instead of just browser console
+            if (window.synapseConsole) {
+                window.synapseConsole.log(message, type);
+            } else {
+                console.log(`[${type.toUpperCase()}] ${message}`);
+            }
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

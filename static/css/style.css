@@ -1,0 +1,290 @@
+/* ==========================================================================
+   Project Synapse - Premium Glass Aesthetic (v3.0)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+:root {
+    /* --- GLASS THEME (Default) --- */
+    --font-heading: 'Inter', 'Noto Sans TC', sans-serif;
+    --font-ui: 'Inter', 'Noto Sans TC', sans-serif;
+
+    /* Colors */
+    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    --secondary-gradient: linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%);
+    --accent-color: #6366f1;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --info-color: #0ea5e9;
+
+    /* Text */
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+
+    /* Glass Effect Variables */
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    --glass-blur: blur(12px);
+
+    /* Spacing & Shapes */
+    --border-radius-lg: 24px;
+    --border-radius-md: 16px;
+    --border-radius-sm: 12px;
+    --nav-height: 80px;
+
+    /* Global Transitions */
+    --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   Global Reset & Body
+   ========================================================================== */
+
+body {
+    font-family: var(--font-ui);
+    color: var(--text-primary);
+    background-color: #f3f4f6;
+    background-image:
+        radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0nYScgeDE9JzAlJyB4Mj0nNTAlJyB5MT0nMCUnIHkyPSc1MCUnPjxzdG9wIG9mZnNldD0nMCUnIHN0b3AtY29sb3I9JyNlMGc4ZmYnLz48c3RvcCBvZmZzZXQ9JzElJyBzdG9wLWNvbG9yPScjZmZmJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndXJsKCNhKScvPjx0ZXh0IHg9JzUwJScgeT0nNTAlJyBmaWxsPSJyZ2JhKDAsMCwwLDAuMDUpIiBmb250LXNpemU9JzIwMCcgdGV4dC1hbmNob3I9J21pZGRsZScgZG9taW5hbnQtYmFzZWxpbmU9J21pZGRsZSc+PC90ZXh0Pjwvc3ZnPg==');
+    background: #f0f2f5;
+    /* Fallback */
+    /* Dynamic Mesh Gradient */
+    background:
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+        #f8fafc;
+    background-attachment: fixed;
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Component: Glass Card
+   ========================================================================== */
+
+.card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--border-radius-lg);
+    transition: var(--transition-smooth);
+    overflow: hidden;
+    /* Ensure rounded corners clip content */
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.2);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.card-header {
+    background: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 1.25rem 1.5rem;
+}
+
+/* ==========================================================================
+   Component: Navbar (Floating Pill)
+   ========================================================================== */
+
+.navbar-container {
+    padding: 1.5rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.navbar {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 100px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    padding: 0.75rem 1.5rem;
+    margin: 0 auto;
+    max-width: 95%;
+    /* Responsive width */
+}
+
+@media (min-width: 992px) {
+    .navbar {
+        max-width: 1200px;
+    }
+}
+
+.nav-link {
+    font-weight: 500;
+    color: var(--text-secondary) !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 100px;
+    transition: var(--transition-fast);
+}
+
+.nav-link:hover,
+.nav-link.active {
+    background-color: rgba(99, 102, 241, 0.1);
+    color: var(--accent-color) !important;
+    font-weight: 600;
+}
+
+.navbar-brand {
+    font-weight: 800;
+    font-size: 1.25rem;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+}
+
+/* ==========================================================================
+   Component: Buttons & Inputs
+   ========================================================================== */
+
+.btn {
+    border-radius: 100px;
+    /* Pill shape standard */
+    padding: 0.6rem 1.5rem;
+    font-weight: 600;
+    transition: var(--transition-fast);
+    border: none;
+    letter-spacing: 0.01em;
+}
+
+.btn-primary {
+    background: var(--primary-gradient);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.45);
+    color: white;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+    box-shadow: none;
+}
+
+.btn-outline-primary:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.form-control,
+.form-select {
+    background-color: rgba(255, 255, 255, 0.6);
+    border: 2px solid transparent;
+    /* Focus ring prep */
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: var(--transition-fast);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: white;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+/* ==========================================================================
+   Utilities & Animations
+   ========================================================================== */
+
+.text-gradient {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.shadow-glow {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Consoles & Code */
+.font-monospace {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+}
+
+/* Loading Overlay Refinement */
+.loading-overlay {
+    backdrop-filter: blur(16px) !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Badges */
+.badge {
+    padding: 0.5em 1em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Fix Bootstrap overrides */
+.bg-light {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.bg-white {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Table overrides */
+.table {
+    --bs-table-bg: transparent;
+}
+
+.table> :not(caption)>*>* {
+    background-color: transparent;
+    border-bottom-color: rgba(0, 0, 0, 0.05);
+}
