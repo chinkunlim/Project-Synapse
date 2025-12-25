@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Classroom 管理 | Project Synapse</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #dd6b20;
+            transform: translateY(-2px);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #courseList {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .course-item {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .course-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .course-item.selected {
+            background: #e9f0ff;
+            border-color: #667eea;
+        }
+
+        .course-item h3 {
+            color: #667eea;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .course-item p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        #statusMessage {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        #statusMessage.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 2px solid #48bb78;
+        }
+
+        #statusMessage.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 2px solid #f56565;
+        }
+
+        #statusMessage.info {
+            background: #bee3f8;
+            color: #2c5282;
+            border: 2px solid #4299e1;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← 返回首頁</a>
+        
+        <header>
+            <h1>📚 Google Classroom 管理</h1>
+            <p>課程管理 | 學生名單 | 主題建立 | 課件發布 | 作業追蹤</p>
+        </header>
+
+        <div id="statusMessage"></div>
+
+        <!-- 認證區 -->
+        <div class="card">
+            <h2>🔐 認證設定</h2>
+            <button class="btn btn-primary" onclick="authenticate()">連接 Google Classroom</button>
+        </div>
+
+        <!-- 課程選擇區 -->
+        <div class="card">
+            <h2>📋 課程列表</h2>
+            <button class="btn btn-primary" onclick="loadCourses()">讀取課程</button>
+            <div id="courseList"></div>
+        </div>
+
+        <!-- 學生管理區 -->
+        <div class="card" id="studentSection" style="display: none;">
+            <h2>👥 學生管理</h2>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="viewStudents()">查看學生名單</button>
+                <button class="btn btn-success" onclick="exportStudents()">導出 Excel</button>
+            </div>
+            <div id="studentList"></div>
+        </div>
+
+        <!-- 主題建立區 -->
+        <div class="card" id="topicSection" style="display: none;">
+            <h2>📌 批次建立主題</h2>
+            <div class="form-group">
+                <label>週數（預設 18 週）</label>
+                <input type="number" id="numWeeks" value="18" min="1" max="52">
+            </div>
+            <div class="form-group">
+                <label>主題前綴</label>
+                <input type="text" id="topicPrefix" value="Week" placeholder="例如: Week, 第幾週">
+            </div>
+            <button class="btn btn-primary" onclick="createTopics()">建立主題</button>
+        </div>
+
+        <!-- 課件發布區 -->
+        <div class="card" id="materialSection" style="display: none;">
+            <h2>📎 發布課件</h2>
+            <div class="form-group">
+                <label>課件標題</label>
+                <input type="text" id="materialTitle" placeholder="例如: 第一週上課講義">
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="materialDescription" rows="3" placeholder="課件說明..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>選擇主題</label>
+                <select id="materialTopic">
+                    <option value="">無主題</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>外部連結（選填）</label>
+                <input type="url" id="materialLink" placeholder="https://...">
+            </div>
+            <div class="form-group">
+                <label>上傳檔案（選填）</label>
+                <input type="file" id="materialFile">
+            </div>
+            <div class="form-group">
+                <label>發布狀態</label>
+                <select id="materialState">
+                    <option value="PUBLISHED">立即發布</option>
+                    <option value="DRAFT">儲存草稿</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="publishMaterial()">發布課件</button>
+        </div>
+
+        <!-- 作業追蹤區 -->
+        <div class="card" id="submissionSection" style="display: none;">
+            <h2>📊 作業呈交進度</h2>
+            <div class="form-group">
+                <label>選擇作業</label>
+                <select id="courseworkSelect">
+                    <option value="">請先選擇作業</option>
+                </select>
+            </div>
+            <button class="btn btn-warning" onclick="checkSubmissions()">檢查進度</button>
+            <div id="submissionStats" class="stats-grid"></div>
+        </div>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: white;">處理中，請稍候...</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedCourseId = null;
+        let selectedCourseName = null;
+
+        function showMessage(message, type = 'info') {
+            const msgBox = document.getElementById('statusMessage');
+            msgBox.textContent = message;
+            msgBox.className = type;
+            msgBox.style.display = 'block';
+            setTimeout(() => {
+                msgBox.style.display = 'none';
+            }, 5000);
+        }
+
+        function showLoading(show = true) {
+            document.getElementById('loadingIndicator').classList.toggle('active', show);
+        }
+
+        async function authenticate() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/classroom/authenticate', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                showMessage(data.message, data.status);
+            } catch (error) {
+                showMessage('認證失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+            async function authenticate() {
+                try {
+                    showLoading('正在取得授權網址...');
+                    const resp = await fetch('/api/classroom/auth/start');
+                    const data = await resp.json();
+                    if (data.status === 'success' && data.authorization_url) {
+                        showMessage('👉 正在開啟 Google 授權頁面...');
+                        window.open(data.authorization_url, '_blank');
+                    } else {
+                        showMessage('❌ ' + (data.message || '取得授權網址失敗'));
+                    }
+                } catch (e) {
+                    showMessage('❌ 認證錯誤: ' + e.message);
+                } finally {
+                    hideLoading();
+                }
+            }
+
+        async function loadCourses() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/classroom/courses');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const courseList = document.getElementById('courseList');
+                    courseList.innerHTML = '';
+                    
+                    data.courses.forEach(course => {
+                        const div = document.createElement('div');
+                        div.className = 'course-item';
+                        div.innerHTML = `
+                            <h3>${course.name}</h3>
+                            <p>${course.section || '無班級資訊'}</p>
+                            <p style="font-size: 0.8rem; color: #999;">ID: ${course.id}</p>
+                        `;
+                        div.onclick = () => selectCourse(course.id, course.name, div);
+                        courseList.appendChild(div);
+                    });
+                    
+                    showMessage(`已載入 ${data.count} 個課程`, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('載入課程失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function selectCourse(courseId, courseName, element) {
+            // 清除其他選中狀態
+            document.querySelectorAll('.course-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            element.classList.add('selected');
+            selectedCourseId = courseId;
+            selectedCourseName = courseName;
+            
+            // 顯示相關功能區塊
+            document.getElementById('studentSection').style.display = 'block';
+            document.getElementById('topicSection').style.display = 'block';
+            document.getElementById('materialSection').style.display = 'block';
+            document.getElementById('submissionSection').style.display = 'block';
+            
+            // 載入主題列表供課件選擇
+            loadTopics(courseId);
+            // 載入作業列表
+            loadCoursework(courseId);
+            
+            showMessage(`已選擇課程: ${courseName}`, 'success');
+        }
+
+        async function viewStudents() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const response = await fetch(`/api/classroom/students/${selectedCourseId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const studentList = document.getElementById('studentList');
+                    studentList.innerHTML = '<h3>學生名單</h3>';
+                    
+                    data.students.forEach(student => {
+                        const div = document.createElement('div');
+                        div.style.padding = '10px';
+                        div.style.borderBottom = '1px solid #eee';
+                        div.innerHTML = `
+                            <strong>${student.profile.name}</strong><br>
+                            <small>${student.profile.emailAddress}</small>
+                        `;
+                        studentList.appendChild(div);
+                    });
+                    
+                    showMessage(`共 ${data.count} 位學生`, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('載入學生名單失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function exportStudents() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                window.location.href = `/api/classroom/students/${selectedCourseId}/export?course_name=${encodeURIComponent(selectedCourseName)}`;
+                showMessage('開始下載學生名單 Excel', 'success');
+            } catch (error) {
+                showMessage('導出失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createTopics() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            
+            const numWeeks = document.getElementById('numWeeks').value;
+            const prefix = document.getElementById('topicPrefix').value;
+            
+            showLoading(true);
+            try {
+                const response = await fetch('/api/classroom/topics/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        course_id: selectedCourseId,
+                        num_weeks: parseInt(numWeeks),
+                        prefix: prefix
+                    })
+                });
+                const data = await response.json();
+                showMessage(data.message, data.status);
+                
+                if (data.status === 'success') {
+                    loadTopics(selectedCourseId);
+                }
+            } catch (error) {
+                showMessage('建立主題失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadTopics(courseId) {
+            try {
+                const response = await fetch(`/api/classroom/topics/${courseId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const select = document.getElementById('materialTopic');
+                    select.innerHTML = '<option value="">無主題</option>';
+                    
+                    data.topics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic.topicId;
+                        option.textContent = topic.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('載入主題失敗:', error);
+            }
+        }
+
+        async function publishMaterial() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            
+            const title = document.getElementById('materialTitle').value;
+            if (!title) {
+                showMessage('請輸入課件標題', 'error');
+                return;
+            }
+            
+            const formData = {
+                course_id: selectedCourseId,
+                title: title,
+                description: document.getElementById('materialDescription').value,
+                topic_id: document.getElementById('materialTopic').value,
+                link_url: document.getElementById('materialLink').value,
+                state: document.getElementById('materialState').value
+            };
+            
+            showLoading(true);
+            try {
+                const response = await fetch('/api/classroom/material/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                showMessage(data.message, data.status);
+                
+                if (data.status === 'success') {
+                    // 清空表單
+                    document.getElementById('materialTitle').value = '';
+                    document.getElementById('materialDescription').value = '';
+                    document.getElementById('materialLink').value = '';
+                }
+            } catch (error) {
+                showMessage('發布課件失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadCoursework(courseId) {
+            try {
+                const response = await fetch(`/api/classroom/coursework/${courseId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const select = document.getElementById('courseworkSelect');
+                    select.innerHTML = '<option value="">請選擇作業</option>';
+                    
+                    data.coursework.forEach(work => {
+                        const option = document.createElement('option');
+                        option.value = work.id;
+                        option.textContent = work.title;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('載入作業失敗:', error);
+            }
+        }
+
+        async function checkSubmissions() {
+            if (!selectedCourseId) {
+                showMessage('請先選擇課程', 'error');
+                return;
+            }
+            
+            const courseworkId = document.getElementById('courseworkSelect').value;
+            if (!courseworkId) {
+                showMessage('請選擇作業', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const response = await fetch(`/api/classroom/submissions/${selectedCourseId}/${courseworkId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const stats = data.stats;
+                    const statsDiv = document.getElementById('submissionStats');
+                    statsDiv.innerHTML = `
+                        <div class="stat-card">
+                            <h3>${stats.total}</h3>
+                            <p>總學生數</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>${stats.turned_in}</h3>
+                            <p>已繳交</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>${stats.late}</h3>
+                            <p>遲交</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>${stats.turned_in_percentage}%</h3>
+                            <p>繳交率</p>
+                        </div>
+                    `;
+                    showMessage('進度統計已更新', 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('檢查進度失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+    </script>
+</body>
+</html>

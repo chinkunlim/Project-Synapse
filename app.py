@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import os
 import requests
 from dotenv import load_dotenv, set_key
@@ -12,6 +12,7 @@ from intergrations.notion import (
     setup_logging
 )
 from utils.google_calendar_sync import GoogleCalendarIntegration
+from utils.google_classroom_integration import GoogleClassroomIntegration
 
 # 初始化日誌系統
 setup_logging()
@@ -22,6 +23,7 @@ ENV_PATH = Path('.env').resolve()
 
 # 初始化 Flask 應用
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret')
 
 # 初始化 Notion 客戶端（若失敗不影響 App 啟動）
 try:
@@ -33,6 +35,13 @@ except Exception as e:
     notion = None
     database_id = None
     notion_processor = None
+
+# 初始化 Google Classroom 整合（若失敗不影響 App 啟動）
+try:
+    classroom_integration = GoogleClassroomIntegration()
+except Exception as e:
+    print(f"Google Classroom 初始化警告: {e}")
+    classroom_integration = None
 
 def fetch_tasks_from_notion():
     """從 Notion 讀取任務"""
@@ -644,6 +653,383 @@ def download_csv_sample(database_type):
         return jsonify({
             "status": "error",
             "message": f"❌ 生成樣本失敗: {str(e)}"
+        }), 500
+
+# === Google Classroom 路由 ===
+
+@app.route('/classroom')
+def classroom_page():
+    """Google Classroom 管理頁面"""
+    return render_template('classroom.html')
+
+@app.route('/api/classroom/auth/start', methods=['GET'])
+def classroom_auth_start():
+    """取得 Google OAuth 授權網址（Web Flow）"""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        from flask import session
+
+        if not classroom_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google Classroom 整合未初始化"
+            }), 500
+
+        # 使用 Web 應用程式流程產生授權網址
+        redirect_uri = 'http://localhost:5001/api/classroom/auth/callback'
+        flow = Flow.from_client_secrets_file(
+            'config/google_credentials.json',
+            scopes=classroom_integration.SCOPES,
+            redirect_uri=redirect_uri
+        )
+
+        auth_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+
+        # 保存 state 以便回調驗證
+        session['oauth_state'] = state
+
+        return jsonify({
+            "status": "success",
+            "authorization_url": auth_url
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 產生授權網址失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/auth/callback', methods=['GET'])
+def classroom_auth_callback():
+    """Google OAuth 回調（Web Flow）"""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        from flask import session, redirect
+
+        if not classroom_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google Classroom 整合未初始化"
+            }), 500
+
+        redirect_uri = 'http://localhost:5001/api/classroom/auth/callback'
+        state = session.get('oauth_state')
+
+        flow = Flow.from_client_secrets_file(
+            'config/google_credentials.json',
+            scopes=classroom_integration.SCOPES,
+            redirect_uri=redirect_uri,
+            state=state
+        )
+
+        # 使用完整的回調 URL 完成 token 交換
+        flow.fetch_token(authorization_response=request.url)
+
+        # 初始化整合並保存憑證
+        success = classroom_integration.set_credentials(flow.credentials)
+        if not success:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 保存憑證失敗"
+            }), 500
+
+        # 回到管理頁
+        return redirect('/classroom')
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 認證回調錯誤: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/authenticate', methods=['POST'])
+def classroom_authenticate():
+    """執行 Google Classroom OAuth 認證"""
+    try:
+        if not classroom_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google Classroom 整合未初始化"
+            }), 500
+        
+        success = classroom_integration.authenticate()
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": "✅ Google Classroom 認證成功！"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 認證失敗，請檢查憑證設定"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 認證錯誤: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/courses', methods=['GET'])
+def get_courses():
+    """獲取所有課程列表"""
+    try:
+        if not classroom_integration:
+            return jsonify({
+                "status": "error",
+                "message": "❌ Google Classroom 整合未初始化"
+            }), 500
+        
+        # 確保已認證
+        if not classroom_integration.classroom_service:
+            success = classroom_integration.authenticate()
+            if not success:
+                return jsonify({
+                    "status": "error",
+                    "message": "❌ 請先完成認證"
+                }), 401
+        
+        courses = classroom_integration.get_courses()
+        
+        return jsonify({
+            "status": "success",
+            "courses": courses,
+            "count": len(courses)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 獲取課程失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/students/<course_id>', methods=['GET'])
+def get_students(course_id):
+    """獲取指定課程的學生名單"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        students = classroom_integration.get_students(course_id)
+        
+        return jsonify({
+            "status": "success",
+            "students": students,
+            "count": len(students)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 獲取學生名單失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/students/<course_id>/export', methods=['GET'])
+def export_students(course_id):
+    """導出學生名單為 Excel 檔案"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        course_name = request.args.get('course_name', 'students')
+        
+        excel_file = classroom_integration.export_students_to_excel(course_id, course_name)
+        
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'{course_name}_學生名單.xlsx'
+        )
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 導出失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/topics/create', methods=['POST'])
+def create_topics():
+    """批次建立主題"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        data = request.json
+        course_id = data.get('course_id')
+        num_weeks = data.get('num_weeks', 18)
+        prefix = data.get('prefix', 'Week')
+        
+        if not course_id:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 缺少 course_id 參數"
+            }), 400
+        
+        topics = classroom_integration.create_topics(course_id, num_weeks, prefix)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"✅ 成功建立 {len(topics)} 個主題",
+            "topics": topics
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 建立主題失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/topics/<course_id>', methods=['GET'])
+def get_topics(course_id):
+    """獲取課程的所有主題"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        topics = classroom_integration.get_topics(course_id)
+        
+        return jsonify({
+            "status": "success",
+            "topics": topics,
+            "count": len(topics)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 獲取主題失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/material/create', methods=['POST'])
+def create_course_material():
+    """發布課件"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        data = request.json
+        course_id = data.get('course_id')
+        title = data.get('title')
+        description = data.get('description', '')
+        topic_id = data.get('topic_id')
+        link_url = data.get('link_url')
+        state = data.get('state', 'PUBLISHED')
+        
+        if not course_id or not title:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 缺少必要參數 (course_id, title)"
+            }), 400
+        
+        # 處理檔案上傳（若有）
+        file_id = None
+        if 'file' in request.files:
+            uploaded_file = request.files['file']
+            if uploaded_file.filename:
+                # 暫存檔案
+                temp_path = f"/tmp/{uploaded_file.filename}"
+                uploaded_file.save(temp_path)
+                
+                # 上傳到 Drive
+                file_id = classroom_integration.upload_file_to_drive(temp_path, uploaded_file.filename)
+                
+                # 刪除暫存檔案
+                os.remove(temp_path)
+        
+        material = classroom_integration.create_course_material(
+            course_id=course_id,
+            title=title,
+            description=description,
+            topic_id=topic_id,
+            file_id=file_id,
+            link_url=link_url,
+            state=state
+        )
+        
+        if material:
+            return jsonify({
+                "status": "success",
+                "message": "✅ 課件發布成功！",
+                "material": material
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 課件發布失敗"
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 發布失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/coursework/<course_id>', methods=['GET'])
+def get_coursework(course_id):
+    """獲取課程的所有作業"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        coursework = classroom_integration.get_all_coursework(course_id)
+        
+        return jsonify({
+            "status": "success",
+            "coursework": coursework,
+            "count": len(coursework)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 獲取作業失敗: {str(e)}"
+        }), 500
+
+@app.route('/api/classroom/submissions/<course_id>/<coursework_id>', methods=['GET'])
+def get_submissions(course_id, coursework_id):
+    """獲取作業的呈交進度統計"""
+    try:
+        if not classroom_integration or not classroom_integration.classroom_service:
+            return jsonify({
+                "status": "error",
+                "message": "❌ 請先完成認證"
+            }), 401
+        
+        stats = classroom_integration.get_coursework_submissions(course_id, coursework_id)
+        
+        return jsonify({
+            "status": "success",
+            "stats": stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"❌ 獲取呈交進度失敗: {str(e)}"
         }), 500
 
 if __name__ == '__main__':
