@@ -114,7 +114,7 @@ GOOGLE_TOKEN_PATH=config/google_token.pickle
 - 確認 OAuth 同意畫面設定完整
 
 ### 問題 2: 權限不足
-- 檢查 Scopes 是否完整加入
+- 檢查 Scopes 是否完整加入（包含 `classroom.profile.emails` 以讀取 Email）
 - 刪除 `config/google_token.pickle` 後重新認證
 
 ### 問題 3: API 配額限制

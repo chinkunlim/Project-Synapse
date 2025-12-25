@@ -25,6 +25,7 @@ class GoogleClassroomIntegration:
     SCOPES = [
         'https://www.googleapis.com/auth/classroom.courses.readonly',
         'https://www.googleapis.com/auth/classroom.rosters.readonly',
+        'https://www.googleapis.com/auth/classroom.profile.emails',
         'https://www.googleapis.com/auth/classroom.topics',
         'https://www.googleapis.com/auth/classroom.courseworkmaterials',
         'https://www.googleapis.com/auth/classroom.coursework.me',
@@ -215,8 +216,10 @@ class GoogleClassroomIntegration:
                     rows = []
                     for s in students:
                         profile = s.get('profile', {})
+                        name_obj = profile.get('name', {}) if isinstance(profile.get('name'), dict) else {}
+                        full_name = name_obj.get('fullName') or profile.get('name') or ''
                         rows.append({
-                            'Name': profile.get('name', ''),
+                            'Name': full_name,
                             'Email': profile.get('emailAddress', ''),
                             'UserId': profile.get('id', ''),
                         })
