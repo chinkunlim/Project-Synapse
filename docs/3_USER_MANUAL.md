@@ -38,7 +38,18 @@ Click on any course card to reveal management tools:
 
 ---
 
-## 4. 📄 Thesis Compilation Factory
+---
+
+## 4. 🧠 Smart Course Generation
+When you import courses via CSV, Project Synapse uses intelligent logic to organize your schedule:
+*   **Auto-Merged Sessions**: Consecutive class periods (e.g., 09:00-10:00, 10:00-11:00) are combined into a single "Class Session" block.
+*   **18-Week Limit**: The system generates exactly 18 weeks of sessions starting from your first class date, skipping major breaks if configured.
+*   **Timezone Aware**: All dates and reminders are strictly set to **Taipei Time (UTC+8)**, ensuring they appear correctly on all your devices.
+*   **Smart Notes**: For every Class Session generated, a corresponding "Lecture Note" page is created in Notion automatically.
+
+---
+
+## 5. 📄 Thesis Compilation Factory
 A powerful tool for academic writing. Convert Markdown into professionally formatted PDFs.
 
 ### **How to Compile a Thesis**

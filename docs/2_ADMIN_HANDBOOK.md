@@ -59,7 +59,26 @@ If a user accidentally deletes a database or property in Notion:
 
 ---
 
-## 4. Maintenance Operations
+---
+
+## 4. Data Import & Sync
+
+### **Google Calendar Synchronization**
+The system syncs semester start/end dates from the "Project Synapse" Google Calendar using smart keyword matching:
+*   **Semester Start**: Prioritizes events exactly named **"全校開始上課"** (Start of all classes). If not found, falls back to generic "Start" events.
+*   **Semester End**: Identified by **"寒假開始"** (Winter Break) or **"暑假開始"** (Summer Break). The semester end date is automatically set to **one day before** the break starts.
+*   **18-Week Rule**: The system strictly limits auto-generated sessions to 18 weeks from the first class date.
+
+### **CSV Import Specification**
+When uploading `Courses` via CSV, the following logic applies:
+*   **Format**: Standard CSV with headers `Name`, `Year`, `Semester`, `Schedule`.
+*   **BOM Handling**: The system automatically strips Byte Order Marks (BOM) from Excel-exported files.
+*   **Empty Rows**: Completely empty rows are automatically filtered out to prevent duplicate phantom courses.
+*   **Session Merging**: Consecutive class periods on the same day (e.g., periods 2, 3, 4) are merged into a single session entry.
+
+---
+
+## 5. Maintenance Operations
 
 ### **Log Management**
 The system logs events to the browser console and server stdout.

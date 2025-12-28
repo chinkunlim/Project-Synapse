@@ -73,7 +73,23 @@ Synapse does not store business data locally. It queries Notion in real-time.
 
 ---
 
-## 4. Extending the Project
+---
+
+## 4. Data Processing Logic
+
+### **Timezone Standardization**
+To avoid "floating time" issues in Notion, all datetime objects are explicitly localized to **UTC+8 (Taipei)** before being sent to the API.
+*   **Implementation**: `datetime.replace(tzinfo=timezone(timedelta(hours=8)))` is applied in `intergrations/notion/processor.py`.
+
+### **Regex-Based Sync**
+`utils/google_calendar_sync.py` uses a priority system for event parsing:
+1.  **High Priority (P2)**: Specific events like `全校開始上課` or prefix-less `寒假開始` (inferred from date).
+2.  **Low Priority (P1)**: Generic `114-1 Start` events.
+This ensures user-specific dates overwrite generic academic calendar dates.
+
+---
+
+## 5. Extending the Project
 
 ### **Adding a New Page/Module**
 1.  **Create Blueprint**: Add `routes/my_new_module.py`. Define a `Blueprint('new_mod', __name__)`.
