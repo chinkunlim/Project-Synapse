@@ -4,7 +4,7 @@ Google Calendar 集成
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
 import logging
 import sys
@@ -95,7 +95,7 @@ class GoogleCalendarIntegration:
         """处理单个日历事件，支持多种命名模式。"""
         summary = event.get('SUMMARY', '').strip()
         date: datetime = event.get('DTSTART')
-
+        
         if not date:
             return
 
@@ -106,7 +106,7 @@ class GoogleCalendarIntegration:
             semester = int(m.group(2))
             event_type = m.group(3).lower()
             is_start = event_type in ['开始', 'start']
-            GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start)
+            GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start, priority=1)
             return
 
         # 模式 B: "108學年度第一學期開始" / "108學年度第二學期開始"
@@ -115,7 +115,7 @@ class GoogleCalendarIntegration:
             year = int(m.group(1))
             sem_token = re.search(r'第?([一二12])學期', summary)
             semester = 1 if sem_token and sem_token.group(1) in ['一', '1'] else 2
-            GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start=True)
+            GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start=True, priority=1)
             return
 
         # 模式 C: "第1學期結束" / "第2學期結束"（无学年度，需根据日期推算）
@@ -124,7 +124,50 @@ class GoogleCalendarIntegration:
             semester = 1 if m.group(1) in ['一', '1'] else 2
             year = GoogleCalendarIntegration._infer_roc_year_from_date(date, semester)
             if year:
-                GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start=False)
+                GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start=False, priority=1)
+            return
+
+        # 模式 D: "全校開始上課" (包括 "114...全校開始上課") (Priority 2)
+        if "全校開始上課" in summary:
+            # 嘗試提取學年/學期，如果有
+            m_prefix = re.match(r'(\d+)學年度第([一二12])學期', summary)
+            if m_prefix:
+                year = int(m_prefix.group(1))
+                sem_token = m_prefix.group(2)
+                semester = 1 if sem_token in ['一', '1'] else 2
+            else:
+                # 無前綴，從日期推斷
+                # 2-7月 -> 下學期(2), 8-1月 -> 上學期(1)
+                semester = 2 if 2 <= date.month <= 7 else 1
+                year = GoogleCalendarIntegration._infer_roc_year_from_date(date, semester)
+            
+            if year:
+                GoogleCalendarIntegration._store_semester_date(semesters, year, semester, date, is_start=True, priority=2)
+            return
+
+        # 模式 E: "寒假開始" / "暑假開始" (End = Date - 1 day) (Priority 2)
+        if "寒假開始" in summary or "暑假開始" in summary:
+             # 嘗試提取學年/學期
+            m_prefix = re.match(r'(\d+)學年度第([一二12])學期', summary)
+            if m_prefix:
+                 year = int(m_prefix.group(1))
+                 sem_token = m_prefix.group(2)
+                 semester = 1 if sem_token in ['一', '1'] else 2
+            else:
+                 # 無前綴，從日期推斷
+                 # 寒假(1月/2月) -> 結束第1學期
+                 # 暑假(6月/7月) -> 結束第2學期
+                 if "寒假" in summary:
+                     semester = 1
+                 else: # 暑假
+                     semester = 2
+                 year = GoogleCalendarIntegration._infer_roc_year_from_date(date, semester)
+            
+            if year:
+                # The semester ENDS the day BEFORE break starts.
+                end_date = date - timedelta(days=1)
+                GoogleCalendarIntegration._store_semester_date(semesters, year, semester, end_date, is_start=False, priority=2)
+            return
 
     @staticmethod
     def _infer_roc_year_from_date(date: datetime, semester: int) -> Optional[int]:
@@ -137,13 +180,19 @@ class GoogleCalendarIntegration:
             return date.year - 1912
 
     @staticmethod
-    def _store_semester_date(semesters: Dict[Tuple[int, int], Dict], year: int, semester: int, date: datetime, is_start: bool):
+    def _store_semester_date(semesters: Dict[Tuple[int, int], Dict], year: int, semester: int, date: datetime, is_start: bool, priority: int = 1):
         if (year, semester) not in semesters:
             semesters[(year, semester)] = {}
-        if is_start:
-            semesters[(year, semester)]['start'] = date
-        else:
-            semesters[(year, semester)]['end'] = date
+            
+        key_date = 'start' if is_start else 'end'
+        key_prio = 'start_prio' if is_start else 'end_prio'
+        
+        current_prio = semesters[(year, semester)].get(key_prio, 0)
+        
+        # Only update if new priority is higher or equal (overwrite generic with specific, or overwrite old specific with new specific)
+        if priority >= current_prio:
+            semesters[(year, semester)][key_date] = date
+            semesters[(year, semester)][key_prio] = priority
     
     @staticmethod
     def validate_semester_data(semesters: Dict[Tuple[int, int], Dict]) -> Dict[Tuple[int, int], Dict]:

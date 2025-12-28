@@ -6,4 +6,5 @@ n8n_data/git*.pickle
 !samples/
 config/google_*.json
 config/google_token*.pickle
-logs/app.log
+logs/
+debug_output*.txt

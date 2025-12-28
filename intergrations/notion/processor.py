@@ -20,16 +20,19 @@ import csv
 import io
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from rich.console import Console
 from tqdm import tqdm
 
 from .client import NotionApiClient
 from .config import notion_config
+from utils.course_schedule_parser import CourseScheduleParser
+from config.course_schedule_config import get_semester_info
 
 # 設定日誌記錄器
 logger = logging.getLogger(__name__)
 console = Console()
+TZ_TAIPEI = timezone(timedelta(hours=8))
 
 
 class NotionProcessor:
@@ -373,6 +376,20 @@ class NotionProcessor:
                     
                     # 將資料庫 ID 儲存到環境變數（如果有指定 env_key）
                     env_key = db_schema.get("env_key")
+                    
+                    # Update: Override legacy env keys with standardized names
+                    key_mapping = {
+                        "NOTION_DATABASE_ID": "", # Deprecated
+                        "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",
+                        "COURSE_DATABASE_ID": "CLASS_SESSION_ID",
+                        "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
+                        "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID",
+                        "NOTE_DB_ID": "NOTE_DATABASE_ID"
+                    }
+                    
+                    if env_key in key_mapping:
+                        env_key = key_mapping[env_key]
+                    
                     if env_key:
                         notion_config.set_env(env_key, new_db_id)
                         logger.debug(f"   已儲存環境變數: {env_key} = {new_db_id}")
@@ -508,8 +525,13 @@ class NotionProcessor:
         """
         try:
             # 解析 CSV 內容
+            # 移除 BOM (Byte Order Mark) 以防 Excel CSV 造成標頭解析錯誤
+            csv_content = csv_content.lstrip('\ufeff')
+            
             csv_reader = csv.DictReader(io.StringIO(csv_content))
-            rows = list(csv_reader)
+            # 過濾完全空白的列 (所有值都為 None 或 空字串)
+            rows = [row for row in csv_reader if any(str(v).strip() for v in row.values() if v)]
+            
             
             # 驗證 CSV 是否為空
             if not rows:
@@ -552,7 +574,8 @@ class NotionProcessor:
                         page_id = page_data.get("id")
                         
                         # 如果是課程匯入，記錄課程資訊以便後續生成會話
-                        if extra_params.get('semester_start') and page_id:
+                        # Update: Support smart mode where semester_start might be missing but sessions_db_id is present
+                        if (extra_params.get('semester_start') or extra_params.get('course_sessions_db_id')) and page_id:
                             course_name = row.get('Name', row.get('Title', f'課程 {row_num}'))
                             created_courses.append({
                                 'id': page_id,
@@ -573,15 +596,16 @@ class NotionProcessor:
                     errors.append(error_msg)
                     logger.error(error_msg)
             
-            # 如果是課程匯入，自動生成課程會話
+            # 5. 課程匯入後，自動生成 Course Sessions
             sessions_created = 0
-            if created_courses and extra_params.get('semester_start'):
+            if created_courses and extra_params.get('course_sessions_db_id'):
                 logger.info(f"📚 開始為 {len(created_courses)} 門課程生成會話...")
                 sessions_created = self._generate_course_sessions(
                     created_courses=created_courses,
                     semester_start=extra_params.get('semester_start'),
                     semester_end=extra_params.get('semester_end'),
-                    sessions_db_id=extra_params.get('course_sessions_db_id')
+                    sessions_db_id=extra_params.get('course_sessions_db_id'),
+                    notes_db_id=extra_params.get('notes_db_id')
                 )
             
             # 建立結果訊息
@@ -626,112 +650,93 @@ class NotionProcessor:
     def _build_properties_from_csv_row(self, row: Dict[str, str]) -> Dict[str, Any]:
         """
         將 CSV 列資料轉換為 Notion 頁面屬性
-        
-        此方法會根據欄位名稱自動判斷屬性類型，並轉換為 Notion API 格式。
-        
-        屬性類型判斷規則：
-        - Title: name, title, 標題, 名稱
-        - Date: date, 日期, deadline, 截止日期
-        - Status: status, 狀態
-        - Select: select, 選項
-        - URL: url, 網址, link, 連結
-        - Email: email, 信箱
-        - Phone: phone, 電話
-        - Number: number, 數字
-        - Rich Text: 其他所有欄位（預設）
-        
-        參數：
-            row (dict): CSV 列資料，格式為 {欄位名: 值}
-        
-        回傳：
-            dict: Notion 頁面屬性字典
-        
-        範例：
-            >>> row = {"Name": "任務 1", "Status": "進行中", "Date": "2025-12-25"}
-            >>> props = processor._build_properties_from_csv_row(row)
         """
         properties = {}
         
+        # 欄位映射表 (CSV Header -> Notion Property Name)
+        # 根據 notion_schema.json 定義
+        key_mapping = {
+            "name": "Course Name",
+            "title": "Course Name", 
+            "標題": "Course Name",
+            "名稱": "Course Name",
+            "code": "Course Code",
+            "instructor": "Professor",
+            "teacher": "Professor",
+            "location": "Class Location", # If exists in DB
+            "remarks": "Remarks" # If exists in DB
+        }
+
         # 逐一處理每個欄位
         for key, value in row.items():
             # 跳過空值
-            if not value or value.strip() == "":
+            if value is None:
                 continue
             
-            # 清理欄位名稱和值
-            key = key.strip()
-            value = value.strip()
+            # 清理欄位名稱 (移除 BOM 和空白)
+            clean_key = key.lstrip('\ufeff').strip()
+            # 清理值
+            clean_value = str(value).strip()
             
-            # 根據欄位名稱判斷屬性類型
-            key_lower = key.lower()
+            if clean_value == "":
+                continue
             
-            if key_lower in ["name", "title", "標題", "名稱"]:
-                # Title 類型（標題欄位）
-                properties[key] = {
-                    "title": [
-                        {
-                            "type": "text",
-                            "text": {"content": value}
-                        }
-                    ]
-                }
-                
-            elif key_lower in ["date", "日期", "deadline", "截止日期"]:
-                # Date 類型（日期欄位）
-                properties[key] = {
-                    "date": {"start": value}
-                }
-                
-            elif key_lower in ["status", "狀態"]:
-                # Status 類型（狀態欄位）
-                properties[key] = {
-                    "status": {"name": value}
-                }
-                
-            elif key_lower in ["select", "選項"]:
-                # Select 類型（單選欄位）
-                properties[key] = {
-                    "select": {"name": value}
-                }
-                
-            elif key_lower in ["url", "網址", "link", "連結"]:
-                # URL 類型（網址欄位）
-                properties[key] = {
-                    "url": value
-                }
-                
-            elif key_lower in ["email", "信箱"]:
-                # Email 類型（電子郵件欄位）
-                properties[key] = {
-                    "email": value
-                }
-                
-            elif key_lower in ["phone", "電話"]:
-                # Phone 類型（電話欄位）
-                properties[key] = {
-                    "phone_number": value
-                }
-                
-            elif key_lower in ["number", "數字"]:
-                # Number 類型（數字欄位）
-                try:
-                    # 嘗試轉換為浮點數
-                    properties[key] = {
-                        "number": float(value)
-                    }
-                except ValueError:
-                    # 轉換失敗，記錄警告
-                    logger.warning(f"無法將 '{value}' 轉換為數字，已跳過")
+            # 跳過純邏輯欄位（不匯入 Notion，但用於後續計算）
+            # Schedule 用於生成 Session, 不需要存入 Course Property (除非 Schema 有定義)
+            # Remarks/Location/備註/地點: 使用者 CSV 有這些欄位，但目前 Notion Schema (Course Hub) 未定義
+            # 為了避免 API 400 錯誤，必須在此跳過。
+            skip_keys = ["schedule", "remarks", "location", "備註", "地點"]
+            if clean_key.lower() in skip_keys:
+                # If Schedule, try to extract "Day" for Course Hub property
+                if clean_key.lower() == "schedule" and clean_value:
+                    # Format: "三9,三10..." -> Take first char "三"
+                    day_char = clean_value[0]
+                    day_map_zh = {"一": "Mon", "二": "Tue", "三": "Wed", "四": "Thu", "五": "Fri", "六": "Sat", "日": "Sun"}
+                    mapped_day = day_map_zh.get(day_char)
                     
+                    if mapped_day:
+                         properties["Day"] = {"select": {"name": mapped_day}}
+
+                continue
+
+            # 映射欄位名稱
+            mapped_key = key_mapping.get(clean_key.lower(), clean_key)
+            
+            # 根據欄位名稱 (mapped_key) 判斷屬性類型
+            key_lower = mapped_key.lower()
+            
+            # 1. 特殊欄位處理
+            if key_lower in ["course name", "name", "title", "標題"]:
+                 # Notion 的 Title 屬性名稱可能因 DB 而異，但通常建立時第一個欄位就是 Title
+                 # 這裡假設 schema 定義的 title key 是 "Course Name" (for Courses) or "Task", "Project", etc.
+                 # 但為了通用性，如果遇到 "name"/"title"，我們嘗試保留原始 key 或使用 mapping
+                 # 若 API 回傳 "Name is not a property"，表示 DB 的 Title 屬性叫做別的
+                 properties[mapped_key] = {
+                    "title": [{"type": "text", "text": {"content": clean_value}}]
+                }
+            
+            # 2. Select 類型
+            elif key_lower in ["semester", "type", "status", "day", "category", "學期", "類型", "狀態"]:
+                properties[mapped_key] = {
+                    "select": {"name": clean_value}
+                }
+
+            # 3. Rich Text 類型 (Course Code, Professor, Credits, etc.)
             else:
-                # Rich Text 類型（富文字欄位，預設類型）
-                properties[key] = {
-                    "rich_text": [
-                        {
-                            "type": "text",
-                            "text": {"content": value}
-                        }
-                    ]
+                 # 若不在上述規則，預設為 Rich Text
+                 # 注意：若該欄位在 Notion DB 不存在，仍會報錯。
+                 # 對於 Courses CSV 的 "Location", "Remarks" 等，若 DB 沒這些欄位，會失敗。
+                 # 暫時保留匯入，若失敗則 User 需要在 DB 加欄位，或我們需過濾。
+                 # 根據 User Log, "Schedule", "Location", "Remarks" 都不存在。
+                 # 我們在前面積極過濾 Schedule。
+                 
+                 # 為了保險，對於 Course Import，我們可以加一個白名單檢查？
+                 # 但這會破壞其他 DB 的靈活度。
+                 # 採取策略：盡量映射，若 User 的 CSV 有多餘欄位且 DB 沒開，就會報錯，這是符合預期的 (User 應修改 DB or CSV)。
+                 # 但針對 User 提供的標準 Course CSV，我們已知 "Code" -> "Course Code", "Instructor" -> "Professor".
+                 
+                 properties[mapped_key] = {
+                    "rich_text": [{"type": "text", "text": {"content": clean_value}}]
                 }
         
         return properties
@@ -739,145 +744,248 @@ class NotionProcessor:
     def _generate_course_sessions(
         self,
         created_courses: List[Dict[str, Any]],
-        semester_start: str,
-        semester_end: str,
-        sessions_db_id: str
+        semester_start: Optional[str],
+        semester_end: Optional[str],
+        sessions_db_id: str,
+        notes_db_id: Optional[str] = None
     ) -> int:
         """
-        為每門課程自動生成 18 堂課程會話
-        
-        此方法會：
-        1. 計算學期總週數
-        2. 平均分配 18 堂課到學期期間
-        3. 為每門課程建立會話記錄
-        4. 建立課程與會話的關聯
-        
-        台灣大學課程系統特點：
-        - 每學期標準為 18 週
-        - 會話日期會平均分配在學期期間
-        - 會話會自動關聯到對應的課程
-        
-        參數：
-            created_courses (list): 已建立的課程列表，每個元素包含：
-                - id: 課程頁面 ID
-                - name: 課程名稱
-                - row_data: CSV 原始資料
-            semester_start (str): 學期開始日期（格式：YYYY-MM-DD）
-            semester_end (str): 學期結束日期（格式：YYYY-MM-DD）
-            sessions_db_id (str): 課程會話資料庫 ID
-        
-        回傳：
-            int: 成功建立的課程會話總數
-        
-        範例：
-            >>> courses = [{'id': 'page_id_1', 'name': '資料結構', 'row_data': {...}}]
-            >>> count = processor._generate_course_sessions(
-            ...     courses, '2025-09-01', '2026-01-15', 'db_id'
-            ... )
-            >>> print(f"已生成 {count} 堂課程會話")
+        Generate class sessions for courses.
+        Supports two modes:
+        1. Smart Mode (Preferred): Uses 'Year', 'Semester', and 'Schedule' columns from CSV to generate precise dates.
+        2. Legacy Mode (Fallback): Distributes 18 sessions evenly between global start/end dates.
         """
-        # 驗證必要參數
         if not sessions_db_id:
-            logger.warning("課程會話資料庫 ID 未設定，跳過會話生成")
+            logger.warning("Course Session DB ID not set, skipping session generation")
             return 0
         
-        try:
-            # 解析日期字串
-            start_date = datetime.strptime(semester_start, "%Y-%m-%d")
-            end_date = datetime.strptime(semester_end, "%Y-%m-%d")
+        total_sessions_created = 0
+        logger.info(f"📚 Starting session generation for {len(created_courses)} courses...")
+
+        # Pre-parse global dates if available (for fallback)
+        global_start = None
+        global_end = None
+        if semester_start and semester_end:
+            try:
+                global_start = datetime.strptime(semester_start, "%Y-%m-%d")
+                global_end = datetime.strptime(semester_end, "%Y-%m-%d")
+            except ValueError:
+                logger.warning("Invalid global semester dates provided")
+
+        for course in tqdm(created_courses, desc="Generating Sessions", unit="course"):
+            course_name = course.get('name', 'Untitled Course')
+            course_id = course.get('id')
+            row_data = course.get('row_data', {})
             
-            # 計算學期總週數
-            semester_weeks = (end_date - start_date).days / 7
+            # --- Attempt Smart Mode ---
+            year_str = row_data.get('Year', row_data.get('year', row_data.get('學年', '')))
+            sem_str = row_data.get('Semester', row_data.get('semester', row_data.get('學期', '')))
             
-            # 計算每堂課的週間隔（18 堂課平均分配）
-            weeks_per_session = max(1, int(semester_weeks / 18))
+            # Support combined "學年學期" column (e.g., "114-1") OR "Semester" column having "114-1"
+            combined_ys = row_data.get('學年學期', '')
             
-            # 統計變數
-            total_sessions_created = 0
+            # Check if 'Semester' column actually holds the combined info (e.g. "114-1")
+            if sem_str and '-' in str(sem_str) and not year_str:
+                 combined_ys = sem_str
             
-            logger.info(f"📚 開始為 {len(created_courses)} 門課程生成會話...")
-            logger.info(f"   學期週數: {semester_weeks:.1f} 週")
-            logger.info(f"   會話間隔: {weeks_per_session} 週")
-            
-            console.print(f"[cyan]📚 為 {len(created_courses)} 門課程生成 18 堂會話[/cyan]")
-            
-            # 為每門課程生成會話
-            for course in tqdm(created_courses, desc="生成會話", unit="門課"):
-                course_name = course.get('name', '未命名課程')
-                course_id = course.get('id')
-                
-                logger.debug(f"為課程 '{course_name}' 生成會話...")
-                
-                # 生成 18 堂課
-                for session_num in range(1, 19):
-                    # 計算會話日期
-                    session_date = start_date + timedelta(
-                        weeks=(session_num - 1) * weeks_per_session
-                    )
+            if not year_str and (not sem_str or '-' in str(sem_str)) and combined_ys and '-' in str(combined_ys):
+                try:
+                    parts = str(combined_ys).split('-')
+                    if len(parts) >= 2:
+                        year_str = parts[0].strip()
+                        sem_str = parts[1].strip()
+                except Exception:
+                    logger.warning(f"Failed to parse '學年學期': {combined_ys}")
+
+            schedule_str = row_data.get('Schedule', row_data.get('schedule', row_data.get('時間', '')))
+
+            sessions_to_create = []
+
+            # valid_smart_mode = False
+            if year_str and sem_str and schedule_str:
+                try:
+                    year = int(year_str)
+                    sem = int(sem_str)
                     
-                    # 確保會話日期不超過學期結束日期
-                    if session_date > end_date:
-                        session_date = end_date
-                    
-                    try:
-                        # 建立會話屬性
-                        session_properties = {
-                            "Name": {
-                                "title": [
-                                    {
-                                        "type": "text",
-                                        "text": {
-                                            "content": f"{course_name} - 第 {session_num} 週"
-                                        }
-                                    }
-                                ]
-                            },
-                            "Date": {
-                                "date": {
-                                    "start": session_date.strftime("%Y-%m-%d")
-                                }
-                            },
-                            "Course": {
-                                "relation": [{"id": course_id}]
-                            }
-                        }
+                    # 1. Get Semester Dates
+                    semester_info = get_semester_info(year, sem)
+                    if semester_info:
+                        # 2. Parse Schedule String (e.g., "一3,一4")
+                        parsed_schedule = CourseScheduleParser.parse_schedule(schedule_str)
                         
-                        # 建立課程會話記錄
-                        session_data = self.client.create_page_in_database(
-                            database_id=sessions_db_id,
-                            properties=session_properties
-                        )
-                        
-                        if session_data:
-                            total_sessions_created += 1
-                        else:
-                            logger.warning(
-                                f"無法為課程 '{course_name}' 建立第 {session_num} 週的會話"
+                        if parsed_schedule:
+                            # 3. Calculate exact class dates
+                            class_dates = CourseScheduleParser.get_class_dates(
+                                parsed_schedule, year, sem
                             )
-                    
+                            
+                            # Limit to approx 18 weeks * sessions_per_week to avoid infinite loops or massive data
+                            # But usually get_class_dates returns exactly what fits in the date range.
+                            
+                            # Merge sessions by date
+                            from itertools import groupby
+                            
+                            # Sort by date and start time to ensure grouping works and times are strict
+                            class_dates.sort(key=lambda x: (x['date'], x['start_time'] or datetime.min.time()))
+                            
+                            start_date = class_dates[0]['date'] if class_dates else datetime.today()
+
+                            for date_key, group in groupby(class_dates, key=lambda x: x['date']):
+                                group_list = list(group)
+                                
+                                # Find start and end time for the merged block
+                                day_start = group_list[0]['start_time']
+                                day_end = group_list[-1]['end_time']
+                                
+                                # Calculate Week Number (1-based)
+                                # Assumption: Semester starts near the first class. 
+                                # Or use 'semester_info["start"]' if available? 
+                                # semester_info dict has 'start' (datetime object).
+                                # User Req 1061: Use First Class Date as anchor (not Semester Start)
+                                sem_start_raw = start_date
+                                
+                                # Ensure both are date objects
+                                d1 = date_key.date() if hasattr(date_key, 'date') else date_key
+                                d2 = sem_start_raw.date() if hasattr(sem_start_raw, 'date') else sem_start_raw
+                                
+                                delta_days = (d1 - d2).days
+                                current_week = (delta_days // 7) + 1
+                                
+                                # Limit to 18 weeks
+                                if current_week > 18:
+                                    logger.debug(f"Skipping session at {date_key} (Week {current_week} > 18)")
+                                    continue
+                                
+                                # Cap week at 18 if desired, or let it flow? User said 1-18. 
+                                # If it goes to 19 (exam week), maybe keep it?
+                                # We'll just use the calculated value.
+                                
+                                sessions_to_create.append({
+                                    "date": date_key,
+                                    "name": f"{course_name}", # Internal ref, override in writer anyway
+                                    "start_time": day_start,
+                                    "end_time": day_end,
+                                    "week": current_week
+                                })
+
+                            # valid_smart_mode = True
+                            logger.debug(f"Smart schedule generated for '{course_name}': {len(sessions_to_create)} merged sessions")
+                        else:
+                            logger.warning(f"Failed to parse schedule string for '{course_name}': {schedule_str}")
+                    else:
+                        logger.warning(f"Semester info not found for Year {year} Sem {sem}")
+                except ValueError as e:
+                    logger.warning(f"Error parsing smart mode data for '{course_name}': {e}")
+
+            # --- Fallback: Legacy Mode ---
+            if not sessions_to_create and global_start and global_end:
+                logger.debug(f"Using fallback legacy mode for '{course_name}'")
+                semester_weeks = (global_end - global_start).days / 7
+                weeks_per_session = max(1, int(semester_weeks / 18))
+                
+                for i in range(1, 19):
+                     session_date = global_start + timedelta(weeks=(i - 1) * weeks_per_session)
+                     if session_date > global_end: session_date = global_end
+                     sessions_to_create.append({
+                         "date": session_date,
+                         "name": f"{course_name} - Week {i}",
+                         "start_time": None,
+                         "end_time": None
+                     })
+
+            # --- Create Notion Pages ---
+            if sessions_to_create:
+                for idx, sess in enumerate(tqdm(sessions_to_create, desc="生成課程會話與筆記", unit="堂")):
+                    try:
+                        # 1. Create Class Session
+                        date_prop = {"start": sess['date'].strftime("%Y-%m-%d")}
+                        
+                        # Add time if available
+                        if sess.get('start_time'):
+                            dt_start = datetime.combine(sess['date'], sess['start_time']).replace(tzinfo=TZ_TAIPEI)
+                            date_prop['start'] = dt_start.isoformat()
+                            
+                            if sess.get('end_time'):
+                                dt_end = datetime.combine(sess['date'], sess['end_time']).replace(tzinfo=TZ_TAIPEI)
+                                date_prop['end'] = dt_end.isoformat()
+
+                            # Calculate metadata
+                            week_num = sess.get('week', idx + 1) # Use calculated week or fallback to index
+                            
+                            # Day mapping
+                            weekday_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                            day_str = weekday_map[sess['date'].weekday()]
+                            
+                            # Time formatting
+                            start_time_str = sess['start_time'].strftime("%H:%M") if sess.get('start_time') else ""
+                            end_time_str = sess['end_time'].strftime("%H:%M") if sess.get('end_time') else ""
+                            
+                            # Semester formatting (Use CSV input raw format "113-1" if available, else formatted label)
+                            # User likely wants "113-1" if that was the input. 
+                            # But wait, create_databases didn't see "113-1" in generated sample.
+                            # We'll use the one derived from input or fallback.
+                            # Let's reuse 'sem_label' logic but prefer raw 'course_semester' if tracked?
+                            # Actually, passing '113-1' style string to Select is fine if it creates option.
+                            # Let's stick to the generated 'sem_label' (e.g. Fall 2024) or customize?
+                            # User input: "Semester" field in CSV is "113-1".
+                            # Let's try to infer from 'sess' if we carried it? No.
+                            # Re-calculate sem_label properly.
+                            
+                            sem_label = "Unknown"
+                            if year and sem:
+                                # Use "113-1" format directly if user prefers? 
+                                # Or "Fall 2024"? User complained about "Week", not "Semester" value specifically.
+                                # But let's look at schema options. Schema has empty options list.
+                                # Let's stick to standard "Fall {AD_Year}" for now or "113-1"?
+                                # Given "113-1" is in CSV, let's try to reconstruct that format.
+                                sem_label = f"{year}-{sem}"
+                            
+                            session_properties = {
+                                "Class Session": {"title": [{"text": {"content": course_name}}]}, # Just Course Name
+                                "Date & Reminder": {"date": date_prop},
+                                "Related to Course Hub": {"relation": [{"id": course_id}]},
+                                "Week": {"number": week_num},
+                                "Day": {"select": {"name": day_str}},
+                                "Start Time": {"rich_text": [{"text": {"content": start_time_str}}]},
+                                "End Time": {"rich_text": [{"text": {"content": end_time_str}}]},
+                                "Semester": {"select": {"name": sem_label}}
+                            }
+                            
+                            session_page = self.client.create_page_in_database(sessions_db_id, session_properties)
+                            
+                            if session_page:
+                                total_sessions_created += 1
+                                session_id = session_page.get('id')
+                                
+                                # 2. Create Note (if DB ID provided)
+                                if notes_db_id and session_id:
+                                    try:
+                                        # Note Title: Lecture Note - {Course Name}
+                                        note_title = f"Lecture Note - {course_name}"
+                                        
+                                        note_properties = {
+                                            "Note": {"title": [{"text": {"content": note_title}}]},
+                                            "Category": {"select": {"name": "Lecture Note"}}, # Singular "Note" based on user req? Or check schema options. Schema says "Lecture Note" (singular).
+                                            "Class Date": {"date": date_prop}, 
+                                            "Related to Course Session": {"relation": [{"id": session_id}]},
+                                            "Related to Course Hub": {"relation": [{"id": course_id}]},
+                                            "Semester": {"select": {"name": sem_label}},
+                                            "Week": {"number": week_num} 
+                                        }
+                                        
+                                        self.client.create_page_in_database(notes_db_id, note_properties)
+                                    
+                                    except Exception as ne:
+                                        logger.error(f"Failed to create Note for {sess['name']}: {ne}")
+
                     except Exception as e:
-                        logger.error(f"建立課程會話時發生錯誤: {str(e)}")
-            
-            # 記錄完成資訊
-            logger.info(f"✅ 成功生成 {total_sessions_created} 堂課程會話")
-            console.print(
-                f"[green]✅ 成功生成 {total_sessions_created} 堂課程會話[/green]"
-            )
-            
-            return total_sessions_created
-            
-        except ValueError as e:
-            # 日期格式錯誤
-            logger.error(f"日期格式錯誤: {str(e)}")
-            console.print(f"[red]❌ 日期格式錯誤: {str(e)}[/red]")
-            console.print("[yellow]日期格式應為 YYYY-MM-DD[/yellow]")
-            return 0
-            
-        except Exception as e:
-            # 其他錯誤
-            logger.error(f"生成課程會話時發生錯誤: {str(e)}", exc_info=True)
-            console.print(f"[red]❌ 生成課程會話失敗: {str(e)}[/red]")
-            return 0
+                        logger.error(f"Failed to create session for {course_name}: {e}")
+            else:
+                 logger.warning(f"No sessions generated for course '{course_name}' - missing Schedule/Year info or global dates.")
+
+        logger.info(f"✅ Successfully generated {total_sessions_created} course sessions")
+        console.print(f"[green]✅ Generated {total_sessions_created} sessions[/green]")
+        return total_sessions_created
     
     @staticmethod
     def generate_csv_sample(database_type: str = "tasks") -> str:
@@ -917,11 +1025,11 @@ class NotionProcessor:
                 ]
             },
             "courses": {
-                "headers": ["Name", "Code", "Instructor", "Schedule", "Credits"],
+                "headers": ["Name", "Semester", "Schedule", "Code", "Instructor", "Credits", "Type", "Location", "Remarks"],
                 "rows": [
-                    ["資料結構", "CS101", "王教授", "週一 09:00-12:00", "3"],
-                    ["演算法", "CS201", "李教授", "週三 13:00-16:00", "3"],
-                    ["機器學習", "CS301", "陳教授", "週五 09:00-12:00", "3"],
+                    ["諮商理論與技術", "114-1", "三9,三10,三11", "CP__20500", "余振民", "3", "核心學程", "社科院D301", "法律社會、犯罪防治與觀護"],
+                    ["人格心理學", "114-1", "二9,二10,二11", "CP__20700", "林繼偉", "3", "核心學程", "社科院D301", "諮商與臨床心理學核心學程"],
+                    ["中文能力與涵養AC", "113-2", "一4,一5,一6", "CLC_6232AC", "謝明陽", "3", "中文必修", "人社二館B107", "中文必修"],
                 ]
             },
             "projects": {

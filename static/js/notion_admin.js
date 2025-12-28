@@ -72,6 +72,14 @@ async function runAction(actionName) {
             if (data.logs) {
                 data.logs.forEach(log => addLog(`   ${log}`, 'info'));
             }
+
+            // Reload page if databases were created to update IDs
+            if (['create_databases', 'init_all', 'reset_all'].includes(actionName)) {
+                setTimeout(() => {
+                    alert('系統設定已更新，頁面將重新整理以載入新的資料庫 ID');
+                    location.reload();
+                }, 1000);
+            }
         } else {
             addLog(`❌ ${data.message}`, 'error');
             if (data.error && window.synapseConsole) {
@@ -125,7 +133,9 @@ async function uploadCSV() {
     }
     const databaseId = getDatabaseId(databaseType);
     if (!databaseId) {
-        alert('❌ 找不到對應的數據庫 ID，請先創建數據庫');
+        const errorMsg = '❌ 找不到對應的數據庫 ID，請先創建數據庫';
+        addLog(errorMsg, 'error');
+        alert(errorMsg);
         return;
     }
 

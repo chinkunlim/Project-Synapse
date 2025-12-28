@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, Response
 import os
-from dotenv import set_key
+from dotenv import set_key, load_dotenv
 from pathlib import Path
 import extensions
 from utils.google_calendar_sync import GoogleCalendarIntegration
@@ -70,6 +70,9 @@ def setup_notion():
 @notion_bp.route('/notion')
 def notion_management():
     """Notion 管理頁面"""
+    # 強制重新載入環境變數，避免讀取到舊的 ID
+    load_dotenv(override=True)
+    
     # 取得環境變數
     api_key = os.getenv("NOTION_API_KEY")
     parent_id = os.getenv("PARENT_PAGE_ID")
@@ -97,6 +100,9 @@ def notion_management():
 @notion_bp.route('/api/notion/action', methods=['POST'])
 def handle_notion_action():
     """處理 Notion 相關操作"""
+    # 強制重新載入環境變數
+    load_dotenv(override=True)
+    
     try:
         if not extensions.notion_processor:
             return jsonify({
@@ -233,7 +239,7 @@ def handle_notion_action():
             
             database_info = []
             for key, value in env_vars.items():
-                if 'DATABASE' in key or 'DB' in key:
+                if '_ID' in key or 'KEY' in key:
                     database_info.append(f"{key}: {'已設置' if value else '未設置'}")
             
             return jsonify({
@@ -361,6 +367,9 @@ def handle_notion_action():
 @notion_bp.route('/api/notion/csv/upload', methods=['POST'])
 def upload_csv_to_notion():
     """上傳 CSV 到 Notion 數據庫"""
+    # 強制重新載入環境變數
+    load_dotenv(override=True)
+    
     try:
         if not extensions.notion_processor:
             return jsonify({
@@ -405,10 +414,13 @@ def upload_csv_to_notion():
             semester_start = request.form.get('semester_start')
             semester_end = request.form.get('semester_end')
             
+            # Pass session DB ID even if dates are missing (dates might be in CSV)
+            extra_params['course_sessions_db_id'] = os.getenv("CLASS_SESSION_ID", "")
+            extra_params['notes_db_id'] = os.getenv("NOTE_DATABASE_ID", "")
+            
             if semester_start and semester_end:
                 extra_params['semester_start'] = semester_start
                 extra_params['semester_end'] = semester_end
-                extra_params['course_sessions_db_id'] = os.getenv("CLASS_SESSION_ID", "")
         
         # 導入到 Notion
         result = extensions.notion_processor.import_csv_to_database(database_id, csv_content, extra_params)

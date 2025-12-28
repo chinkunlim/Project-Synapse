@@ -56,7 +56,59 @@ async function authenticate() {
 }
 
 // Course Management
-async function loadCourses() {
+// Course Management
+function renderCourseList(courses) {
+    const courseList = document.getElementById('courseList');
+    courseList.innerHTML = '';
+
+    if (!courses || courses.length === 0) {
+        courseList.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <h5 class="text-muted">No Courses Found</h5>
+                <p class="small text-muted">You don't have any active courses as a Teacher.</p>
+            </div>
+            `;
+        return;
+    }
+
+    courses.forEach(course => {
+        const item = document.createElement('div');
+        item.className = 'course-card card h-100 border-0 shadow-sm flex-shrink-0';
+        item.style.minWidth = '240px';
+        item.style.maxWidth = '240px';
+        item.style.scrollSnapAlign = 'start';
+        item.setAttribute('onclick', `selectCourse('${course.id}', '${course.name}', this)`);
+
+        item.innerHTML = `
+            <div class="card-body p-3">
+                <h6 class="card-title text-dark fw-bold mb-1 text-truncate" title="${course.name}">${course.name}</h6>
+                <p class="card-text text-muted small mb-0 text-truncate">${course.section || 'General'}</p>
+            </div>
+        `;
+        courseList.appendChild(item);
+    });
+}
+
+async function loadCourses(force = false) {
+    const CACHE_KEY = 'synapse_classroom_courses';
+
+    // 1. Try Cache
+    if (!force) {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+            try {
+                const courses = JSON.parse(cached);
+                if (window.synapseConsole) window.synapseConsole.log("Rendering from cache", "info");
+                renderCourseList(courses);
+                return; // Skip fetch
+            } catch (e) {
+                console.warn('Cache corrupted', e);
+                sessionStorage.removeItem(CACHE_KEY);
+            }
+        }
+    }
+
+    // 2. Fetch if no cache or forced
     showLoading(true);
     try {
         const url = '/api/classroom/courses?role=teacher';
@@ -83,35 +135,8 @@ async function loadCourses() {
         const data = await response.json();
 
         if (data.status === 'success') {
-            const courseList = document.getElementById('courseList');
-            courseList.innerHTML = '';
-
-            if (data.courses.length === 0) {
-                courseList.innerHTML = `
-                    <div class="col-12 text-center py-5">
-                        <h5 class="text-muted">No Courses Found</h5>
-                        <p class="small text-muted">You don't have any active courses as a Teacher.</p>
-                    </div>
-                 `;
-            }
-
-            data.courses.forEach(course => {
-                const item = document.createElement('div');
-                item.className = 'course-card card h-100 border-0 shadow-sm flex-shrink-0';
-                item.style.minWidth = '240px';
-                item.style.maxWidth = '240px';
-                item.style.scrollSnapAlign = 'start';
-                item.setAttribute('onclick', `selectCourse('${course.id}', '${course.name}', this)`);
-
-                item.innerHTML = `
-                    <div class="card-body p-3">
-                        <h6 class="card-title text-dark fw-bold mb-1 text-truncate" title="${course.name}">${course.name}</h6>
-                        <p class="card-text text-muted small mb-0 text-truncate">${course.section || 'General'}</p>
-                    </div>
-                `;
-                courseList.appendChild(item);
-            });
-
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.courses));
+            renderCourseList(data.courses);
             showMessage(`已載入 ${data.count} 個課程`, 'success');
         } else {
             showMessage(data.message, 'error');

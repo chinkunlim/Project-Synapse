@@ -226,13 +226,12 @@ class NotionConfig:
         env_keys = [
             "NOTION_API_KEY",        # Notion API 金鑰
             "PARENT_PAGE_ID",        # 父頁面 ID
-            "NOTION_DATABASE_ID",    # 主資料庫 ID
             "TASK_DATABASE_ID",      # 任務資料庫 ID
             "COURSE_HUB_ID",         # 課程中心資料庫 ID
             "CLASS_SESSION_ID",      # 課程會話資料庫 ID
-            "NOTE_DB_ID",            # 筆記資料庫 ID
-            "PROJECT_DB_ID",         # 專案資料庫 ID
-            "RESOURCE_DB_ID",        # 資源資料庫 ID
+            "NOTE_DATABASE_ID",      # 筆記資料庫 ID
+            "PROJECT_DATABASE_ID",   # 專案資料庫 ID
+            "RESOURCE_DATABASE_ID",  # 資源資料庫 ID
         ]
         
         # 只回傳已設定的環境變數

@@ -65,8 +65,10 @@ class Semester:
 # 默认学年学期配置
 # 可以从 Google Calendar 或数据库动态更新
 SEMESTER_DATABASE = {
+    (113, 1): Semester(113, 1, datetime(2024, 9, 1), datetime(2025, 1, 31)),
+    (113, 2): Semester(113, 2, datetime(2025, 2, 1), datetime(2025, 6, 30)),
     (114, 1): Semester(114, 1, datetime(2025, 9, 1), datetime(2026, 1, 31)),
-    (114, 2): Semester(114, 2, datetime(2026, 2, 1), datetime(2026, 6, 30)),
+    (114, 2): Semester(114, 2, datetime(2026, 2, 23), datetime(2026, 6, 30)),
     (115, 1): Semester(115, 1, datetime(2026, 9, 1), datetime(2027, 1, 31)),
     (115, 2): Semester(115, 2, datetime(2027, 2, 1), datetime(2027, 6, 30)),
 }

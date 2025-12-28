@@ -18,7 +18,6 @@ class Config:
     
     # Integrations
     NOTION_API_KEY = os.getenv('NOTION_API_KEY')
-    NOTION_DATABASE_ID = os.getenv('NOTION_DATABASE_ID')
     
     # Google Credentials Paths
     GOOGLE_CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')

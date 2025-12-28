@@ -1,6 +1,6 @@
 """
-Google Classroom 整合模組
-提供課程管理、學生名單導出、主題建立、課件發布等功能
+Google Classroom Integration Module
+Provides functionality for course management, student list export, topic creation, coursework publication, etc.
 """
 
 import os
@@ -16,10 +16,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 import pandas as pd
+import threading
 
 
 class GoogleClassroomIntegration:
-    """Google Classroom API 整合類"""
+    """Google Classroom API Integration Class"""
     
     # OAuth 2.0 權限範圍
     SCOPES = [
@@ -35,22 +36,21 @@ class GoogleClassroomIntegration:
     
     def __init__(self, credentials_path: str = 'config/google_credentials.json'):
         """
-        初始化 Google Classroom 整合
+        Initialize Google Classroom Integration
         
         Args:
-            credentials_path: OAuth 2.0 憑證 JSON 檔案路徑
+            credentials_path: Path to OAuth 2.0 credentials JSON file
         """
         self.credentials_path = Path(credentials_path)
         self.token_path = Path('config/google_token.pickle')
         self.creds = None
-        self.classroom_service = None
-        self.drive_service = None
+        self._thread_local = threading.local()
         
         # 嘗試自動載入 Token
         self._try_load_token()
         
     def _try_load_token(self):
-        """嘗試從檔案載入 Token"""
+        """Try to load Token from file"""
         try:
             if self.token_path.exists():
                 with open(self.token_path, 'rb') as token:
@@ -68,19 +68,51 @@ class GoogleClassroomIntegration:
                              print(f"⚠️ Classroom Token 刷新失敗: {e}")
                              self.creds = None
 
+
                     if self.creds and self.creds.valid:
-                        self.classroom_service = build('classroom', 'v1', credentials=self.creds)
-                        self.drive_service = build('drive', 'v3', credentials=self.creds)
+                        # 驗證成功，延遲建立 service
                         print("✅ Google Classroom Token 載入成功")
         except Exception as e:
             print(f"⚠️ Token 載入失敗: {e}")
 
+    def _get_classroom_service(self):
+        """Get Classroom Service for current thread"""
+        if not self.creds: return None
+        if not hasattr(self._thread_local, 'classroom'):
+            try:
+                self._thread_local.classroom = build('classroom', 'v1', credentials=self.creds)
+            except Exception as e:
+                print(f"❌ 建立 Thread-Local Classroom Service 失敗: {e}")
+                return None
+        return self._thread_local.classroom
+
+    def _get_drive_service(self):
+        """Get Drive Service for current thread"""
+        if not self.creds: return None
+        if not hasattr(self._thread_local, 'drive'):
+            try:
+                self._thread_local.drive = build('drive', 'v3', credentials=self.creds)
+            except Exception as e:
+                print(f"❌ 建立 Thread-Local Drive Service 失敗: {e}")
+                return None
+        return self._thread_local.drive
+
+    @property
+    def classroom_service(self):
+        """Property to access the thread-local classroom service (backward compatibility)"""
+        return self._get_classroom_service()
+
+    @property
+    def drive_service(self):
+        """Property to access the thread-local drive service (backward compatibility)"""
+        return self._get_drive_service()
+
     def authenticate(self) -> bool:
         """
-        執行 OAuth 2.0 認證流程
+        Execute OAuth 2.0 Authentication Flow
         
         Returns:
-            bool: 認證是否成功
+            bool: Whether authentication was successful
         """
         try:
             # 載入已存在的憑證
@@ -110,9 +142,9 @@ class GoogleClassroomIntegration:
                 with open(self.token_path, 'wb') as token:
                     pickle.dump(self.creds, token)
             
-            # 建立服務物件
-            self.classroom_service = build('classroom', 'v1', credentials=self.creds)
-            self.drive_service = build('drive', 'v3', credentials=self.creds)
+            # 建立服務物件 (清除 thread local cache)
+            if hasattr(self._thread_local, 'classroom'): del self._thread_local.classroom
+            if hasattr(self._thread_local, 'drive'): del self._thread_local.drive
             
             return True
             
@@ -122,10 +154,10 @@ class GoogleClassroomIntegration:
 
     def get_oauth_flow(self, redirect_uri: str = None) -> Flow:
         """
-        建立 Web OAuth Flow 物件
+        Create Web OAuth Flow Object
         
         Args:
-            redirect_uri: 回調網址
+            redirect_uri: Callback URL
         """
         if not self.credentials_path.exists():
             raise FileNotFoundError(f"Credential file not found: {self.credentials_path}")
@@ -138,13 +170,13 @@ class GoogleClassroomIntegration:
 
     def set_credentials(self, creds: Credentials) -> bool:
         """
-        以既有的 Credentials 完成整合初始化，並持久化憑證
+        Initialize integration with existing Credentials and persist them.
 
         Args:
-            creds: 已完成交換的 Google OAuth 憑證
+            creds: Exchanged Google OAuth credentials
 
         Returns:
-            bool: 是否初始化成功
+            bool: Whether initialization was successful
         """
         try:
             self.creds = creds
@@ -154,9 +186,9 @@ class GoogleClassroomIntegration:
             with open(self.token_path, 'wb') as token:
                 pickle.dump(self.creds, token)
 
-            # 建立服務物件
-            self.classroom_service = build('classroom', 'v1', credentials=self.creds)
-            self.drive_service = build('drive', 'v3', credentials=self.creds)
+            # 建立服務物件 (清除 thread local cache)
+            if hasattr(self._thread_local, 'classroom'): del self._thread_local.classroom
+            if hasattr(self._thread_local, 'drive'): del self._thread_local.drive
 
             return True
         except Exception as e:
@@ -165,16 +197,17 @@ class GoogleClassroomIntegration:
     
     def get_courses(self) -> Optional[List[Dict]]:
         """
-        獲取所有課程列表
+        Get all courses list
         
         Returns:
-            List[Dict]: 課程資訊列表，包含 id, name, section 等。若未認證返回 None。
+            List[Dict]: List of course info including id, name, section etc. Returns None if not authenticated.
         """
         try:
-            if not self.classroom_service:
+            service = self._get_classroom_service()
+            if not service:
                 return None
 
-            results = self.classroom_service.courses().list(
+            results = service.courses().list(
                 pageSize=100,
                 courseStates=['ACTIVE']
             ).execute()
@@ -201,16 +234,17 @@ class GoogleClassroomIntegration:
 
     def get_my_courses(self, role: str = 'teacher') -> Optional[List[Dict]]:
         """
-        只列出與目前帳號相關的課程
+        List courses related to the current account.
 
         Args:
-            role: 'teacher' 或 'student'
+            role: 'teacher' or 'student'
 
         Returns:
-            List[Dict]: 課程資訊列表。若未認證返回 None。
+            List[Dict]: List of course info. Returns None if not authenticated.
         """
         try:
-            if not self.classroom_service:
+            service = self._get_classroom_service()
+            if not service:
                 return None
 
             kwargs = {
@@ -222,7 +256,7 @@ class GoogleClassroomIntegration:
             elif role == 'student':
                 kwargs['studentId'] = 'me'
 
-            results = self.classroom_service.courses().list(**kwargs).execute()
+            results = service.courses().list(**kwargs).execute()
             courses = results.get('courses', [])
 
             return [{
@@ -244,10 +278,12 @@ class GoogleClassroomIntegration:
 
     def get_grade_categories(self, course_id: str) -> List[Dict]:
         """
-        獲取課程的成績類別
+        Get grade categories for a course
         """
         try:
-            course = self.classroom_service.courses().get(id=course_id).execute()
+            service = self._get_classroom_service()
+            if not service: return []
+            course = service.courses().get(id=course_id).execute()
             return course.get('gradeCategories', [])
         except Exception as e:
             print(f"❌ 獲取成績類別失敗: {e}")
@@ -255,23 +291,26 @@ class GoogleClassroomIntegration:
 
     def export_all_students_to_excel(self, courses: List[Dict], filename: str = 'all_students') -> str:
         """
-        將多個課程的學生名單導出至同一個 Excel 檔案（多工作表）
+        Export student lists of multiple courses to a single Excel file (multiple sheets)
 
         Args:
-            courses: 課程列表，需包含 'id' 與 'name'
-            filename: 輸出檔名（不含副檔名）
+            courses: List of courses, must contain 'id' and 'name'
+            filename: Output filename (without extension)
 
         Returns:
-            str: 生成的 Excel 檔案路徑
+            str: Path to the generated Excel file
         """
         try:
             output_path = f"/tmp/{filename}.xlsx"
             with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+                service = self._get_classroom_service()
+                if not service: return ""
+                
                 for course in courses:
                     course_id = course['id']
                     course_name = course.get('name', f"course_{course_id}")
                     # 讀取學生名單
-                    results = self.classroom_service.courses().students().list(
+                    results = service.courses().students().list(
                         courseId=course_id,
                         pageSize=200
                     ).execute()
@@ -304,20 +343,23 @@ class GoogleClassroomIntegration:
 
     def create_topics_from_names(self, course_id: str, names: List[str]) -> List[Dict]:
         """
-        依照提供的名稱清單建立主題
+        Create topics from a list of names
 
         Args:
-            course_id: 課程 ID
-            names: 主題名稱列表
+            course_id: Course ID
+            names: List of topic names
 
         Returns:
-            List[Dict]: 建立後的主題資訊
+            List[Dict]: Information of created topics
         """
         try:
+            service = self._get_classroom_service()
+            if not service: return []
+            
             created = []
             for name in names:
                 body = {"name": name}
-                topic = self.classroom_service.courses().topics().create(
+                topic = service.courses().topics().create(
                     courseId=course_id,
                     body=body
                 ).execute()
@@ -333,19 +375,19 @@ class GoogleClassroomIntegration:
                            assignee_mode: str = 'ALL_STUDENTS', student_ids: Optional[List[str]] = None,
                            grade_category_id: Optional[str] = None, grading_period_id: Optional[str] = None) -> Optional[Dict]:
         """
-        建立作業（CourseWork）
+        Create Assignment (CourseWork)
 
         Args:
-            course_id: 課程 ID
-            title: 作業標題
-            description: 作業描述
-            max_points: 滿分
-            due_date: 到期日，格式例如 {"year":2025,"month":1,"day":15}
-            topic_id: 主題 ID（選填）
-            state: 狀態 'PUBLISHED' 或 'DRAFT'
+            course_id: Course ID
+            title: Assignment title
+            description: Assignment description
+            max_points: Maximum points
+            due_date: Due date, e.g. {"year":2025,"month":1,"day":15}
+            topic_id: Topic ID (optional)
+            state: State 'PUBLISHED' or 'DRAFT'
 
         Returns:
-            Optional[Dict]: 建立的作業物件
+            Optional[Dict]: Created assignment object
         """
         try:
             body = {
@@ -392,7 +434,11 @@ class GoogleClassroomIntegration:
                 body["individualStudentsOptions"] = {"studentIds": student_ids}
             else:
                 body["assigneeMode"] = 'ALL_STUDENTS'
-            coursework = self.classroom_service.courses().courseWork().create(
+            
+            service = self._get_classroom_service()
+            if not service: return None
+            
+            coursework = service.courses().courseWork().create(
                 courseId=course_id,
                 body=body
             ).execute()
@@ -403,16 +449,19 @@ class GoogleClassroomIntegration:
     
     def get_students(self, course_id: str) -> List[Dict]:
         """
-        獲取指定課程的學生名單
+        Get student list for a specific course
         
         Args:
-            course_id: 課程 ID
+            course_id: Course ID
             
         Returns:
-            List[Dict]: 學生資訊列表
+            List[Dict]: List of student info
         """
         try:
-            results = self.classroom_service.courses().students().list(
+            service = self._get_classroom_service()
+            if not service: return []
+            
+            results = service.courses().students().list(
                 courseId=course_id,
                 pageSize=100
             ).execute()
@@ -436,14 +485,14 @@ class GoogleClassroomIntegration:
     
     def export_students_to_excel(self, course_id: str, course_name: str) -> BytesIO:
         """
-        將學生名單導出為 Excel 檔案
+        Export student list to an Excel file
         
         Args:
-            course_id: 課程 ID
-            course_name: 課程名稱（用於檔案命名）
+            course_id: Course ID
+            course_name: Course Name (used for filename)
             
         Returns:
-            BytesIO: Excel 檔案的二進制流
+            BytesIO: Binary stream of the Excel file
         """
         students = self.get_students(course_id)
         
@@ -478,24 +527,27 @@ class GoogleClassroomIntegration:
     
     def create_topics(self, course_id: str, num_weeks: int, prefix: str = "Week") -> List[Dict]:
         """
-        批次建立 N 週的主題
+        Batch create topics for N weeks
         
         Args:
-            course_id: 課程 ID
-            num_weeks: 週數
-            prefix: 主題名稱前綴（預設 "Week"）
+            course_id: Course ID
+            num_weeks: Number of weeks
+            prefix: Topic name prefix (default "Week")
             
         Returns:
-            List[Dict]: 建立成功的主題列表
+            List[Dict]: List of created topics
         """
         created_topics = []
         
         try:
+            service = self._get_classroom_service()
+            if not service: return created_topics
+
             # 從最後一項開始建立（反向）
             for week in range(num_weeks, 0, -1):
                 topic_name = f"{prefix} {week}"
                 
-                topic = self.classroom_service.courses().topics().create(
+                topic = service.courses().topics().create(
                     courseId=course_id,
                     body={'name': topic_name}
                 ).execute()
@@ -517,16 +569,19 @@ class GoogleClassroomIntegration:
     
     def get_topics(self, course_id: str) -> List[Dict]:
         """
-        獲取課程的所有主題
+        Get all topics of a course
         
         Args:
-            course_id: 課程 ID
+            course_id: Course ID
             
         Returns:
-            List[Dict]: 主題列表
+            List[Dict]: List of topics
         """
         try:
-            results = self.classroom_service.courses().topics().list(
+            service = self._get_classroom_service()
+            if not service: return []
+            
+            results = service.courses().topics().list(
                 courseId=course_id,
                 pageSize=100
             ).execute()
@@ -546,21 +601,24 @@ class GoogleClassroomIntegration:
     
     def _find_or_create_folder(self, folder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """
-        在指定父資料夾中搜尋資料夾，若不存在則建立
+        Find a folder in a specific parent folder, create if not exists
 
         Args:
-            folder_name: 資料夾名稱
-            parent_id: 父資料夾 ID（若為 None 則為根目錄）
+            folder_name: Folder name
+            parent_id: Parent folder ID (Root if None)
 
         Returns:
-            str: 資料夾 ID
+            str: Folder ID
         """
         try:
+            service = self._get_drive_service()
+            if not service: return None
+
             q = f"mimeType='application/vnd.google-apps.folder' and name='{folder_name}' and trashed=false"
             if parent_id:
                 q += f" and '{parent_id}' in parents"
             
-            results = self.drive_service.files().list(q=q, fields="files(id)").execute()
+            results = service.files().list(q=q, fields="files(id)").execute()
             files = results.get('files', [])
             
             if files:
@@ -574,7 +632,10 @@ class GoogleClassroomIntegration:
             if parent_id:
                 metadata['parents'] = [parent_id]
                 
-            folder = self.drive_service.files().create(body=metadata, fields='id').execute()
+            if parent_id:
+                metadata['parents'] = [parent_id]
+                
+            folder = service.files().create(body=metadata, fields='id').execute()
             return folder.get('id')
             
         except Exception as e:
@@ -583,14 +644,14 @@ class GoogleClassroomIntegration:
 
     def ensure_course_folder_structure(self, course_name: str, subfolder: str) -> Optional[str]:
         """
-        確保 Drive 中存在 Classroom/<Course>/<Subfolder> 結構
+        Ensure structure Classroom/<Course>/<Subfolder> exists in Drive
 
         Args:
-            course_name: 課程名稱
-            subfolder: 子資料夾名稱 (Materials 或 Assignments)
+            course_name: Course Name
+            subfolder: Subfolder Name (Materials or Assignments)
 
         Returns:
-            str: 目標資料夾 ID
+            str: Target folder ID
         """
         # 1. Ensure 'Classroom' root folder
         classroom_id = self._find_or_create_folder("Classroom")
@@ -606,15 +667,15 @@ class GoogleClassroomIntegration:
 
     def upload_file_to_drive(self, file_path: str, file_name: str = None, parent_id: str = None) -> Optional[str]:
         """
-        上傳檔案到 Google Drive
+        Upload file to Google Drive
 
         Args:
-            file_path: 本地檔案路徑
-            file_name: Drive 中的檔案名稱
-            parent_id: 指定上傳到的資料夾 ID
+            file_path: Local file path
+            file_name: File name in Drive
+            parent_id: Target folder ID to upload to
 
         Returns:
-            Optional[str]: Drive 檔案 ID，失敗返回 None
+            Optional[str]: Drive File ID, returns None if failed
         """
         try:
             if not file_name:
@@ -626,7 +687,10 @@ class GoogleClassroomIntegration:
                 
             media = MediaFileUpload(file_path, resumable=True)
 
-            file = self.drive_service.files().create(
+            service = self._get_drive_service()
+            if not service: return None
+
+            file = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id'
@@ -642,14 +706,14 @@ class GoogleClassroomIntegration:
 
     def list_drive_files(self, query: Optional[str] = None, page_size: int = 50) -> List[Dict]:
         """
-        取得 Google Drive 檔案列表（不含資料夾）
+        Get list of Google Drive files (excluding folders)
 
         Args:
-            query: Drive 搜尋字串（可為 None 表示不過濾）
-            page_size: 每頁筆數
+            query: Drive search query string (None for no filter)
+            page_size: Number of items per page
 
         Returns:
-            List[Dict]: 檔案資訊
+            List[Dict]: File information
         """
         try:
             q = "trashed = false and mimeType != 'application/vnd.google-apps.folder'"
@@ -657,7 +721,11 @@ class GoogleClassroomIntegration:
                 # 基本名稱搜尋
                 safe_query = query.replace("'", "\\'")
                 q += f" and name contains '{safe_query}'"
-            results = self.drive_service.files().list(
+            
+            service = self._get_drive_service()
+            if not service: return []
+
+            results = service.files().list(
                 q=q,
                 pageSize=page_size,
                 fields="files(id, name, mimeType, modifiedTime, owners(emailAddress, displayName))"
@@ -678,19 +746,19 @@ class GoogleClassroomIntegration:
         state: str = "PUBLISHED"
     ) -> Optional[Dict]:
         """
-        發布課件（可包含 Drive 檔案或外部連結）
+        Publish Course Material (can include Drive files or external links)
         
         Args:
-            course_id: 課程 ID
-            title: 課件標題
-            description: 課件描述
-            topic_id: 主題 ID（選填）
-            file_id: Google Drive 檔案 ID（選填）
-            link_url: 外部連結 URL（選填）
-            state: 發布狀態 ("PUBLISHED" 或 "DRAFT")
+            course_id: Course ID
+            title: Material Title
+            description: Material Description
+            topic_id: Topic ID (optional)
+            file_id: Google Drive File ID (optional)
+            link_url: External Link URL (optional)
+            state: Publish state ("PUBLISHED" or "DRAFT")
             
         Returns:
-            Optional[Dict]: 建立的課件資訊
+            Optional[Dict]: Created material info
         """
         try:
             body = {
@@ -722,7 +790,10 @@ class GoogleClassroomIntegration:
                     }
                 })
             
-            material = self.classroom_service.courses().courseWorkMaterials().create(
+            service = self._get_classroom_service()
+            if not service: return None
+            
+            material = service.courses().courseWorkMaterials().create(
                 courseId=course_id,
                 body=body
             ).execute()
@@ -745,17 +816,20 @@ class GoogleClassroomIntegration:
     
     def get_coursework_submissions(self, course_id: str, coursework_id: str) -> Dict:
         """
-        獲取作業的學生呈交進度統計
+        Get student submission progress stats for a CourseWork
         
         Args:
-            course_id: 課程 ID
-            coursework_id: 作業 ID
+            course_id: Course ID
+            coursework_id: CourseWork ID
             
         Returns:
-            Dict: 包含各狀態統計的字典
+            Dict: Dictionary containing stats for each state
         """
         try:
-            results = self.classroom_service.courses().courseWork().studentSubmissions().list(
+            service = self._get_classroom_service()
+            if not service: return {'total': 0, 'error': "Authentication failed"}
+
+            results = service.courses().courseWork().studentSubmissions().list(
                 courseId=course_id,
                 courseWorkId=coursework_id,
                 pageSize=100
@@ -797,17 +871,21 @@ class GoogleClassroomIntegration:
     
     def get_all_coursework(self, course_id: str) -> List[Dict]:
         """
-        獲取課程的所有作業
+        Get all CourseWork for a course
         
         Args:
-            course_id: 課程 ID
+            course_id: Course ID
             
         Returns:
-            List[Dict]: 作業列表
+            List[Dict]: List of CourseWork
         """
         try:
-            results = self.classroom_service.courses().courseWork().list(
+            service = self._get_classroom_service()
+            if not service: return []
+
+            results = service.courses().courseWork().list(
                 courseId=course_id,
+                orderBy='dueDate desc',
                 pageSize=100
             ).execute()
             
@@ -830,7 +908,9 @@ class GoogleClassroomIntegration:
             "coursework": [], "stats": {}
         }
         
-        if not self.classroom_service: return data
+        if not self.creds: return data
+        service = self._get_classroom_service()
+        if not service: return data
 
         # --- Step 1: Metadata Batch ---
         def cb_students(request_id, response, exception):
@@ -870,13 +950,13 @@ class GoogleClassroomIntegration:
                     'workType': w['workType']
                 } for w in response.get('courseWork', [])]
 
-        batch1 = self.classroom_service.new_batch_http_request()
+        batch1 = service.new_batch_http_request()
         
         # Add requests to Batch 1
-        batch1.add(self.classroom_service.courses().students().list(courseId=course_id, pageSize=100), callback=cb_students)
-        batch1.add(self.classroom_service.courses().topics().list(courseId=course_id, pageSize=100), callback=cb_topics)
-        batch1.add(self.classroom_service.courses().get(id=course_id), callback=cb_course)
-        batch1.add(self.classroom_service.courses().courseWork().list(courseId=course_id, pageSize=100), callback=cb_coursework)
+        batch1.add(service.courses().students().list(courseId=course_id, pageSize=100), callback=cb_students)
+        batch1.add(service.courses().topics().list(courseId=course_id, pageSize=100), callback=cb_topics)
+        batch1.add(service.courses().get(id=course_id), callback=cb_course)
+        batch1.add(service.courses().courseWork().list(courseId=course_id, pageSize=100), callback=cb_coursework)
         
         try:
             batch1.execute()
@@ -910,11 +990,11 @@ class GoogleClassroomIntegration:
                 
                 submission_stats[request_id] = stats
 
-        batch2 = self.classroom_service.new_batch_http_request(callback=cb_stats)
+        batch2 = service.new_batch_http_request(callback=cb_stats)
         
         for cw in data["coursework"]:
             batch2.add(
-                self.classroom_service.courses().courseWork().studentSubmissions().list(
+                service.courses().courseWork().studentSubmissions().list(
                     courseId=course_id, 
                     courseWorkId=cw['id'], 
                     pageSize=100

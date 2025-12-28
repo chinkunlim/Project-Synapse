@@ -153,7 +153,7 @@ class NotionApiClient:
                 
             except requests.exceptions.HTTPError as e:
                 # HTTP 錯誤（4xx, 5xx）
-                status_code = e.response.status_code if e.response else 'N/A'
+                status_code = e.response.status_code if e.response is not None else 'N/A'
                 logger.error(f"❌ HTTP 錯誤: {status_code}")
                 
                 if e.response is not None:
