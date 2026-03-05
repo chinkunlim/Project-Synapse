@@ -191,19 +191,25 @@ class NotionProcessor:
     def _generate_course_sessions(self, created_courses: List[Dict[str, Any]], sessions_db_id: str, notes_db_id: Optional[str] = None) -> int:
         if not sessions_db_id: return 0
         total = 0
+        
+        # 確保導入必要的工具
+        from itertools import groupby
+        
         for course in created_courses:
             course_name = course.get('name')
             course_id = course.get('id')
             row_data = course.get('row_data', {})
             
+            # 保留原本穩定的 Key 值讀取邏輯
             year_str = row_data.get('Year', row_data.get('学年', '114'))
             sem_str = row_data.get('Semester', row_data.get('学期', '1'))
-            # 處理可能包含橫槓的學期格式 (如 114-1)
             if '-' in sem_str: year_str, sem_str = sem_str.split('-')
             
             schedule_str = row_data.get('Schedule', row_data.get('上课时间', ''))
             
-            if not year_str or not sem_str or not schedule_str: continue
+            if not year_str or not sem_str or not schedule_str:
+                logger.warning(f"課程 {course_name} 缺少必要時間資訊，跳過生成。")
+                continue
             
             try:
                 year, sem = int(year_str), int(sem_str)
@@ -213,15 +219,17 @@ class NotionProcessor:
                 if semester_info and parsed_schedule:
                     class_dates = CourseScheduleParser.get_class_dates(parsed_schedule, year, sem)
                     class_dates.sort(key=lambda x: (x['date'], x['start_time'] or datetime.min.time()))
+                    
                     start_date = class_dates[0]['date'] if class_dates else datetime.today()
                     
-                    from itertools import groupby
                     for date_key, group in groupby(class_dates, key=lambda x: x['date']):
                         delta_days = (date_key.date() - start_date.date()).days if hasattr(date_key, 'date') else (date_key - start_date).days
                         current_week = (delta_days // 7) + 1
                         if current_week > 18: continue
                         
                         date_prop = {"start": date_key.strftime("%Y-%m-%d")}
+                        
+                        # 1. 建立 Class Session
                         session_properties = {
                             "Class Session": {"title": [{"text": {"content": f"{course_name} - Week {current_week}"}}]},
                             "Date & Reminder": {"date": date_prop},
@@ -230,20 +238,26 @@ class NotionProcessor:
                         }
                         
                         session_page = self.client.create_page_in_database(sessions_db_id, session_properties)
+                        
                         if session_page and notes_db_id:
                             total += 1
                             session_id = session_page.get('id')
                             
-                            # 空白筆記生成
+                            # 2. 建立 Lecture Note (包含新屬性)
                             note_properties = {
                                 "Note": {"title": [{"text": {"content": f"Lecture Note - {course_name} W{current_week}"}}]},
                                 "Class Date": {"date": date_prop},
+                                "Favourite": {"checkbox": False},              # 初始化為未收藏
+                                "Last reviewed": {"date": None},               # 初始化為空
+                                # Last edited time 是系統屬性，Notion 會自動生成，不需寫入
                                 "Related to Course Session": {"relation": [{"id": session_id}]},
                                 "Related to Course Hub": {"relation": [{"id": course_id}]}
                             }
                             self.client.create_page_in_database(notes_db_id, note_properties)
+                            
             except Exception as e:
-                logger.error(f"會話生成失敗: {e}")
+                logger.error(f"為 {course_name} 生成會話失敗: {e}")
+                
         return total
 
     def generate_onboarding_page(self, parent_page_id: Optional[str] = None) -> bool:
