@@ -91,12 +91,12 @@ class NotionProcessor:
                     
                     env_key = db_schema.get("env_key")
                     key_mapping = {
-                        "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",
-                        "COURSE_DATABASE_ID": "CLASS_SESSION_ID",
-                        "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
-                        "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID",
+                        "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",   # v3.0 對應
+                        "COURSE_DATABASE_ID": "CLASS_SESSION_ID", # v3.0 對應
                         "NOTE_DB_ID": "NOTE_DATABASE_ID",
-                        "THEORY_DB_ID": "THEORY_HUB_ID"
+                        "THEORY_DB_ID": "THEORY_HUB_ID",
+                        "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
+                        "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID"
                     }
                     if env_key in key_mapping: env_key = key_mapping[env_key]
                     if env_key: notion_config.set_env(env_key, new_db_id)
@@ -283,26 +283,155 @@ class NotionProcessor:
         except Exception:
             return False
 
-    @staticmethod
-    def generate_csv_sample(database_type: str) -> str:
-        """新增：生成符合 v3.0 架構的供使用者下載的 CSV 樣本"""
+    
+    def generate_csv_sample(self, database_id: str) -> str:
+        """
+        動態獲取 Notion 資料庫最新結構並生成 CSV 範本文字
+        """
+        if not database_id:
+            return "Error: 無法生成範本，因為資料庫 ID 為空。請先初始化系統。"
+
+        db_info = self.client.retrieve_database(database_id)
+        if not db_info:
+            return "Error: 無法讀取 Notion 資料庫結構。請確認 API Key 是否正確且已邀請機器人加入該頁面。"
+
+        properties = db_info.get("properties", {})
+        
+        # 提取所有欄位名稱，並確保 'title' 類型的欄位排在第一位
+        headers = []
+        for name, prop in properties.items():
+            if prop.get("type") == "title":
+                headers.insert(0, name)
+            else:
+                headers.append(name)
+
+        # 使用 CSV 模組生成字串內容
         output = io.StringIO()
         writer = csv.writer(output)
+        writer.writerow(headers) # 寫入表頭 (與 Notion 欄位名稱完全一致)
         
-        if database_type == 'courses':
-            writer.writerow(['Course Name', 'Course Code', 'Professor', 'Semester', 'Type', 'Schedule'])
-            writer.writerow(['發展心理學', 'PSY1001', '王教授', '114-1', '必修', '一2/一3/一4'])
-            writer.writerow(['認知神經科學', 'PSY2002', '李教授', '114-1', '選修', '三6/三7/三8'])
-            writer.writerow(['Python程式設計', 'CSIE1001', '張教授', '114-1', '通識', '五2/五3/五4'])
-        elif database_type == 'tasks':
-            writer.writerow(['Task', 'Status', 'Deadline'])
-            writer.writerow(['閱讀心理學 CH1', 'Not started', '2026-03-10'])
-            writer.writerow(['Python 作業一', 'In progress', '2026-03-15'])
-        else:
-            writer.writerow(['Name', 'Description'])
-            writer.writerow(['Sample Item', 'This is a sample format'])
-            
+        # 寫入一行範例資料
+        sample_row = []
+        for h in headers:
+            p_type = properties[h].get("type")
+            if p_type == "title": sample_row.append("範例標題")
+            elif p_type == "date": sample_row.append(datetime.now().strftime("%Y-%m-%d"))
+            elif p_type == "select": sample_row.append("選項一")
+            elif p_type == "checkbox": sample_row.append("false")
+            else: sample_row.append("範例內容")
+        
+        writer.writerow(sample_row)
         return output.getvalue()
+
+    def _convert_block_to_payload(self, block: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """轉換 Block 為佈局格式"""
+        b_type = block.get('type')
+        if not b_type or b_type == 'child_database': return None
+        content = block.get(b_type, {})
+        return {"object": "block", "type": b_type, b_type: {"rich_text": content.get("rich_text", [])}}
+
+    def sync_notion_to_local_schema(self) -> bool:
+        """同步資料庫結構 + 首頁佈局 (含拖入的子頁面)"""
+        try:
+            parent_id = notion_config.parent_page_id
+            schema_path = notion_config.schema_path
+            latest_path = schema_path.parent / "notion_schema_latest.json"
+            
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+
+            # 同步資料庫 (修正 v3.0 的 Key 映射)
+            key_map = {"SUBJECT_DATABASE_ID": "COURSE_HUB_ID", "COURSE_DATABASE_ID": "CLASS_SESSION_ID", 
+                       "NOTE_DB_ID": "NOTE_DATABASE_ID", "THEORY_DB_ID": "THEORY_HUB_ID"}
+            
+            for db in schema.get("databases", []):
+                actual_key = key_map.get(db.get("env_key"), db.get("env_key"))
+                db_id = notion_config.get_env(actual_key)
+                if db_id:
+                    info = self.client.retrieve_database(db_id)
+                    if info: db["properties"] = {n: {v.get("type"): {}} for n, v in info.get("properties", {}).items()}
+
+            # 同步首頁佈局 (Layout) - 包含您拖入的頁面與新區塊
+            blocks = self.client.get_block_children(parent_id)
+            if blocks:
+                schema["layout"] = [self._convert_block_to_payload(b) for b in blocks if self._convert_block_to_payload(b)]
+
+            with open(latest_path, "w", encoding="utf-8") as f:
+                json.dump(schema, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            logger.error(f"同步失敗: {e}"); return False
+
+    def initialize_system(self, parent_page_id: str, use_latest: bool = False) -> Dict[str, Any]:
+        """核心修復：根據選擇的版本初始化系統"""
+        logs = []
+        try:
+            # 1. 確定 Schema 來源
+            schema_file = "notion_schema_latest.json" if use_latest else "notion_schema.json"
+            schema_path = notion_config.schema_path.parent / schema_file
+            
+            if use_latest and not schema_path.exists():
+                logs.append("⚠️ 找不到最新同步版，自動退回使用初始版設定")
+                schema_path = notion_config.schema_path
+            
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema_data = json.load(f)
+            
+            # 2. 徹底清空父頁面 (確保權限正確)
+            logs.append(f"🗑️ 正在清空頁面並準備使用「{schema_file}」...")
+            if not self.client.delete_blocks(parent_page_id):
+                return {"success": False, "message": "無法清空頁面，請檢查 PARENT_PAGE_ID 或機器人權限", "logs": logs}
+
+            # 3. 建立資料庫 (使用傳入的 schema 資料)
+            db_ids = self._create_databases_logic(parent_page_id, schema_data.get("databases", []))
+            if not db_ids:
+                return {"success": False, "message": "資料庫建立失敗", "logs": logs}
+            logs.append(f"✅ 成功建立 {len(db_ids)} 個資料庫並更新環境變數")
+
+            # 4. 構建佈局 (Layout) - 這是讓頁面「有反應」的關鍵
+            layout_payload = schema_data.get("layout", [])
+            if layout_payload:
+                self.client.append_block_children(parent_page_id, layout_payload)
+                logs.append(f"✅ 佈局構建完成 (共 {len(layout_payload)} 個區塊)")
+
+            # 5. 生成指南
+            self.generate_onboarding_page(parent_page_id)
+            logs.append("✅ 系統指南已生成")
+
+            return {"success": True, "message": "系統初始化完全成功", "logs": logs}
+        except Exception as e:
+            logger.error(f"初始化崩潰: {e}")
+            return {"success": False, "message": str(e), "logs": logs}
+
+    def _create_databases_logic(self, parent_id: str, db_configs: List[Dict]) -> Dict[str, str]:
+        """私有方法：執行資料庫建立與雙向關聯設置"""
+        created_dbs = {}
+        # 步驟 A: 建立基礎資料庫
+        for db_cfg in db_configs:
+            db_name = db_cfg.get("db_name")
+            props = {k: v for k, v in db_cfg.get("properties", {}).items() if "relation_placeholder" not in v}
+            res = self.client.create_database(parent_id, db_cfg.get("title", db_name), props)
+            if res:
+                new_id = res.get("id")
+                created_dbs[db_name] = new_id
+                # 更新環境變數 (需對應 v3.0 的 Key)
+                env_key = db_cfg.get("env_key")
+                key_map = {"SUBJECT_DATABASE_ID": "COURSE_HUB_ID", "COURSE_DATABASE_ID": "CLASS_SESSION_ID", "NOTE_DB_ID": "NOTE_DATABASE_ID", "THEORY_DB_ID": "THEORY_HUB_ID"}
+                actual_key = key_map.get(env_key, env_key)
+                if actual_key: notion_config.set_env(actual_key, new_id)
+        
+        # 步驟 B: 建立關聯
+        for db_cfg in db_configs:
+            db_id = created_dbs.get(db_cfg.get("db_name"))
+            rel_props = {}
+            for p_n, p_d in db_cfg.get("properties", {}).items():
+                if "relation_placeholder" in p_d:
+                    target_id = created_dbs.get(p_d["relation_placeholder"].get("db_name"))
+                    if target_id:
+                        rel_props[p_n] = {"relation": {"database_id": target_id, "type": "dual_property", "dual_property": {}}}
+            if rel_props:
+                self.client._send_request("PATCH", f"databases/{db_id}", {"properties": rel_props})
+        return created_dbs
 
 # 向後相容函式
 def execute_test_connection(api_key: str) -> bool: return NotionProcessor(api_key).test_connection()

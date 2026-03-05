@@ -68,26 +68,30 @@
 
     <!-- 2. Data Management (Top Right) -->
     <div class="col-lg-6">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-header bg-white border-bottom pt-4 pb-2">
-                <h5 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-server text-info me-2"></i> Data Management
-                    <span class="fs-6 text-muted fw-normal ms-1">數據管理</span>
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-4">Tools for managing database configurations and external syncs.
-                    <br>用於管理資料庫配置與外部同步。</p>
-                <div class="d-grid gap-3">
-                    <button onclick="runAction('list_databases')" class="btn btn-light text-start py-2 border">
-                        <i class="fa-solid fa-list me-3 text-secondary"></i> List Database IDs / 列出資料庫 ID
-                    </button>
-                    <button onclick="runAction('sync_calendar')" class="btn btn-light text-start py-2 border">
-                        <i class="fa-solid fa-calendar me-3 text-secondary"></i> Sync Semester Dates / 同步學期日期
-                    </button>
-                </div>
+    <div class="card h-100 shadow-sm border-0">
+        <div class="card-header bg-white border-bottom pt-4 pb-2">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="fa-solid fa-server text-info me-2"></i> Data Management <span class="fs-6 text-muted fw-normal ms-1">數據管理</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-4">Tools for managing database configurations and external syncs.
+                <br>用於管理資料庫配置與外部同步。</p>
+            <div class="d-grid gap-3">
+                <button onclick="runAction('sync_schema')" class="btn btn-light text-start py-2 border">
+                    <i class="fa-solid fa-arrows-rotate me-3 text-info"></i> Sync Notion Structure / 同步 Notion 結構
+                </button>
+                
+                <button onclick="runAction('list_databases')" class="btn btn-light text-start py-2 border">
+                    <i class="fa-solid fa-list me-3 text-secondary"></i> List Database IDs / 列出資料庫 ID
+                </button>
+                <button onclick="runAction('sync_calendar')" class="btn btn-light text-start py-2 border">
+                    <i class="fa-solid fa-calendar me-3 text-secondary"></i> Sync Semester Dates / 同步學期日期
+                </button>
             </div>
         </div>
     </div>
+</div>
 
     <!-- 3. Quick Setup (Bottom Left) -->
     <div class="col-lg-6">

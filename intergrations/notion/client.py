@@ -83,6 +83,18 @@ class NotionApiClient:
         logger.error("❌ 連線失敗，請檢查 API 金鑰")
         return None
     
+    def retrieve_database(self, database_id: str) -> Optional[Dict[str, Any]]:
+        """獲取資料庫最新結構資訊"""
+        logger.info(f"🔍 讀取資料庫結構: {database_id}")
+        response = self._send_request("GET", f"databases/{database_id}")
+        return response.json() if response and response.status_code == 200 else None
+
+    def get_block_children(self, block_id: str) -> Optional[List[Dict[str, Any]]]:
+        """獲取頁面或區塊的所有子內容"""
+        logger.info(f"📖 讀取區塊內容: {block_id}")
+        response = self._send_request("GET", f"blocks/{block_id}/children?page_size=100")
+        return response.json().get('results', []) if response and response.status_code == 200 else None
+    
     def append_block_children(self, parent_page_id: str, layout_payload: List[Dict[str, Any]]) -> Optional[requests.Response]:
         logger.info(f"📝 新增區塊內容到頁面: {parent_page_id}")
         payload = {"children": layout_payload}

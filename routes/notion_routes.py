@@ -71,6 +71,19 @@ def notion_management():
 
 @notion_bp.route('/api/notion/action', methods=['POST'])
 def handle_notion_action():
+    data = request.json
+    action = data.get("action")
+    version = data.get("version", "initial") # 預設使用初始版
+    
+    if action == "init_all":
+        use_latest = (version == "latest")
+        success = extensions.notion_processor.initialize_system(
+            os.getenv("PARENT_PAGE_ID"), 
+            use_latest=use_latest
+        )
+        msg = "最新版" if use_latest else "初始版"
+        return jsonify({"status": "success", "message": f"✅ 已使用「{msg}」完成初始化"})
+    
     load_dotenv(override=True)
     try:
         if not extensions.notion_processor:
@@ -87,24 +100,31 @@ def handle_notion_action():
 
         if action == "build_layout":
             result = extensions.notion_processor.build_dashboard_layout(parent_id)
-            return jsonify({"status": "success", "message": "✅ 佈局構建成功！"}) if result else jsonify({"status": "error", "message": "❌ 佈局構建失敗"}), 500
+            # 修正：確保 500 錯誤只在失敗時回傳
+            if result:
+                return jsonify({"status": "success", "message": "✅ 佈局構建成功！"})
+            return jsonify({"status": "error", "message": "❌ 佈局構建失敗"}), 500
 
         elif action == "create_databases":
             result = extensions.notion_processor.create_databases(parent_id)
-            return jsonify({"status": "success", "message": "✅ 數據庫創建成功！"}) if result else jsonify({"status": "error", "message": "❌ 數據庫創建失敗"}), 500
-
+            # 修正：確保成功時回傳 200
+            if result:
+                return jsonify({"status": "success", "message": "✅ 數據庫創建成功！"})
+            return jsonify({"status": "error", "message": "❌ 數據庫創建失敗"}), 500
+        
         elif action == "init_all":
-            logs = []
-            tests = [
-                ("連接測試", extensions.notion_processor.test_connection()),
-                ("佈局構建", extensions.notion_processor.build_dashboard_layout(parent_id)),
-                ("數據庫創建", extensions.notion_processor.create_databases(parent_id)),
-                ("生成指南", extensions.notion_processor.generate_onboarding_page(parent_id))
-            ]
-            for name, res in tests: logs.append(f"{'✅' if res else '❌'} {name}")
-            if all(r for _, r in tests): return jsonify({"status": "success", "message": "✅ 初始化完成！", "logs": logs})
-            return jsonify({"status": "partial", "message": "⚠️ 部分步驟失敗", "logs": logs}), 500
-
+            # 獲取前端傳來的版本參數 (initial 或 latest)
+            version = request.json.get("version", "initial")
+            use_latest = (version == "latest")
+            
+            # 呼叫整合後的初始化邏輯
+            result = extensions.notion_processor.initialize_system(parent_id, use_latest=use_latest)
+            
+            if result["success"]:
+                return jsonify({"status": "success", "message": result["message"], "logs": result["logs"]})
+            else:
+                return jsonify({"status": "error", "message": result["message"], "logs": result["logs"]}), 500
+            
         elif action == "clean":
             result = extensions.notion_processor.delete_blocks(parent_id)
             return jsonify({"status": "success", "message": "🧹 頁面內容與資料庫已清空封存"}) if result else jsonify({"status": "error", "message": "❌ 清空失敗"}), 500
@@ -132,6 +152,12 @@ def handle_notion_action():
                 return jsonify({"status": "success", "message": "🧹 系統已重置！頁面已清空且解除綁定。", "logs": logs})
             return jsonify({"status": "partial", "message": "⚠️ 清空過程中發生錯誤", "logs": logs}), 500
 
+        elif action == "sync_schema":
+            success = extensions.notion_processor.sync_notion_to_local_schema()
+            if success:
+                return jsonify({"status": "success", "message": "🔄 已同步最新結構與首頁佈局！"})
+            return jsonify({"status": "error", "message": "❌ 同步失敗，請確認 API 權限與資料庫 ID"}), 500
+        
         elif action == "list_databases":
             env_vars = _get_env_values()
             info = [f"{k}: {'已設置' if v else '未設置'}" for k, v in env_vars.items() if '_ID' in k or 'KEY' in k]
@@ -216,5 +242,36 @@ def update_env_vars():
 
 @notion_bp.route('/api/notion/csv/sample/<database_type>')
 def download_csv_sample(database_type):
-    from intergrations.notion import NotionProcessor
-    return Response(NotionProcessor.generate_csv_sample(database_type), mimetype='text/csv', headers={'Content-Disposition': f'attachment; filename={database_type}_sample.csv'})
+    # 從 .env 中讀取目前該類別對應的最新 ID
+    env_ids = _get_env_values()
+    mapping = {
+        "courses": env_ids.get("COURSE_HUB_ID"),
+        "tasks": env_ids.get("TASK_DATABASE_ID"),
+        "planner": env_ids.get("PLANNER_DATABASE_ID"),
+        "notes": env_ids.get("NOTE_DATABASE_ID"),
+        "theory": env_ids.get("THEORY_HUB_ID")
+    }
+    
+    db_id = mapping.get(database_type)
+    
+    if not db_id:
+        return jsonify({
+            "status": "error", 
+            "message": f"找不到 {database_type} 的資料庫 ID。請確認是否已點擊『一鍵初始化』建立資料庫。"
+        }), 400
+
+    try:
+        # 重要：使用已初始化的處理器實體，傳入動態獲取的 db_id
+        csv_content = extensions.notion_processor.generate_csv_sample(db_id)
+        
+        if csv_content.startswith("Error"):
+            return jsonify({"status": "error", "message": csv_content}), 500
+            
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={database_type}_latest_sample.csv'}
+        )
+    except Exception as e:
+        # 這裡會捕捉到您剛才看到的參數缺失錯誤並顯示在畫面上
+        return jsonify({"status": "error", "message": f"❌ 生成最新範本失敗: {str(e)}"}), 500

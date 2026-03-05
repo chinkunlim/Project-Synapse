@@ -29,6 +29,7 @@ function clearLog() {
 
 // Run Notion Action
 async function runAction(actionName) {
+    // 1. 定義指令的友善中文名稱
     const actionMessages = {
         'test_connection': '測試 Notion API 連接',
         'build_layout': '構建儀表板佈局',
@@ -40,11 +41,14 @@ async function runAction(actionName) {
         'check_schema': '檢查 Schema 配置',
         'show_env': '顯示環境變數',
         'sync_calendar': '同步學期起迄日 (Google Calendar)',
-        'get_env': '讀取環境變數'
+        'get_env': '讀取環境變數',
+        'sync_schema': '同步 Notion 資料庫結構' // 新增功能說明
     };
 
+    let version = 'initial'; // 預設使用初始版 Schema
     const dangerActions = ['clean', 'reset_all'];
 
+    // 2. 處理危險操作確認
     if (dangerActions.includes(actionName)) {
         if (!confirm(`⚠️ 警告：確定要執行「${actionMessages[actionName]}」嗎？\n\n此操作可能會刪除數據！`)) {
             addLog('❌ 操作已取消', 'warning');
@@ -52,44 +56,65 @@ async function runAction(actionName) {
         }
     }
 
-    addLog(`🚀 開始執行: ${actionMessages[actionName]}`, 'info');
-    showLoading(`正在執行: ${actionMessages[actionName]}...`);
+    // 3. 處理初始化時的版本選擇邏輯
+    if (actionName === 'init_all') {
+        const useLatest = confirm(
+            "🚀 準備執行一鍵初始化\n\n" +
+            "【確定】：使用「同步版」 (包含您在 Notion 手動新增的欄位)\n" +
+            "【取消】：使用「初始版」 (還原至系統最初預設的乾淨結構)"
+        );
+        version = useLatest ? 'latest' : 'initial';
+        addLog(`方案選擇: 將使用「${useLatest ? '最新同步版' : '原始初始版'}」進行建置`, 'info');
+    }
+
+    // 4. 開始執行 UI 反饋
+    addLog(`🚀 開始執行: ${actionMessages[actionName] || actionName}`, 'info');
+    if (typeof showLoading === 'function') {
+        showLoading(`正在執行: ${actionMessages[actionName]}...`);
+    }
 
     try {
+        // 5. 發送請求至後端 API
         const response = await fetch('/api/notion/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: actionName })
+            body: JSON.stringify({ 
+                action: actionName,
+                version: version // 帶入版本選擇參數
+            })
         });
 
         const data = await response.json();
 
         if (response.ok && data.status === 'success') {
             addLog(`✅ ${data.message}`, 'success');
-            if (data.details) {
-                console.log(data.details);
-            }
+            
+            if (data.details) console.log("Details:", data.details);
             if (data.logs) {
                 data.logs.forEach(log => addLog(`   ${log}`, 'info'));
             }
 
-            // Reload page if databases were created to update IDs
-            if (['create_databases', 'init_all', 'reset_all'].includes(actionName)) {
+            // 6. 判斷是否需要重新整理頁面 (更新 ID 顯示或下載連結)
+            const refreshActions = ['create_databases', 'init_all', 'reset_all', 'sync_schema'];
+            if (refreshActions.includes(actionName)) {
                 setTimeout(() => {
-                    alert('系統設定已更新，頁面將重新整理以載入新的資料庫 ID');
+                    alert(data.message || '系統狀態已更新，頁面將重新整理以載入最新設定。');
                     location.reload();
                 }, 1000);
             }
         } else {
-            addLog(`❌ ${data.message}`, 'error');
+            addLog(`❌ 錯誤: ${data.message || '請求失敗'}`, 'error');
             if (data.error && window.synapseConsole) {
                 addLog(window.synapseConsole.formatError(data.error), 'error');
             }
         }
     } catch (error) {
-        addLog(`❌ 請求失敗: ${error.message}`, 'error');
+        addLog(`❌ 網路請求失敗: ${error.message}`, 'error');
+        console.error("RunAction Error:", error);
     } finally {
-        hideLoading();
+        if (typeof hideLoading === 'function') {
+            hideLoading();
+        }
     }
 }
 
