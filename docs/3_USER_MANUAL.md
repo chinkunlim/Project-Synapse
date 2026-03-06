@@ -14,13 +14,14 @@ A real-time feedback log appears at the bottom of every page:
 - **View**: All operation history is logged here
 
 ### Navigation
-The top navbar links to all modules:
-- **🏠 Dashboard** — Overview and task list
-- **🏫 Classroom** — Google Classroom management
-- **🗺️ Notion Admin** — Database sync and import
-- **⚡ Automation** — N8N workflow management
-- **📄 Thesis** — PDF compilation
-- **⚙️ System Admin** — Settings and environment variables
+The top navbar links to all modules (in order):
+- **Dashboard** — Overview and task list
+- **Classroom** — Google Classroom management
+- **Notion Admin** — Database sync and import
+- **Thesis** — PDF compilation
+- **Automation** — N8N workflow management
+- **Docs** — This documentation (in-app reader)
+- **Admin** *(dropdown)* — System Settings
 
 ---
 
@@ -28,9 +29,15 @@ The top navbar links to all modules:
 
 Your real-time status overview:
 - **To-Do List**: Tasks from your Notion `Tasks` database — check boxes to mark done instantly
-- **NDHU Tasks**: From Google Tasks (NDHU administrative tasks)
+- **NDHU Tasks**: From Google Tasks (NDHU administrative tasks). Click **Connect NDHU** to authenticate if showing as disconnected.
 - **Connection Status**: N8N, Google Classroom, and Notion connectivity indicators
 - **Quick Links**: Frequently-used resources
+
+---
+
+## 3. 📖 Docs
+
+The built-in documentation viewer at `http://localhost:5003/docs` renders all 4 docs files directly in the browser. Use this to reference guides without leaving the app.
 
 ---
 
@@ -168,17 +175,23 @@ Convert Markdown + bibliography into professionally formatted PDFs.
 
 ---
 
-## 7. ⚙️ System Admin
+## 7. ⚙️ System Admin (`/admin`)
 
 ### System Settings
-All environment variables are managed here, organized in two sections:
+All environment variables are managed here, in two groups:
 - **NOTION CONFIGURATION**: `NOTION_API_KEY`, `PARENT_PAGE_ID`
-- **OTHER SETTINGS**: Active database IDs (`COURSE_HUB_ID`, etc.), `ENROLLMENT_YEAR`, `N8N_API_KEY`
+- **OTHER SETTINGS**: All database IDs, `ENROLLMENT_YEAR`, `N8N_API_KEY`
 
-Sensitive values (keys and IDs) are masked with `*` by default. Click the eye icon 👁 to reveal.
+Sensitive values are masked by default. Click the eye icon 👁 to reveal.
+
+### Save & Restart
+After modifying any setting, click **Save**. Changes write to `.env` on disk. Restart Docker for session-level changes to take full effect:
+```bash
+docker-compose down && docker-compose up -d
+```
 
 ### Enrollment Year
-Set `ENROLLMENT_YEAR` (ROC calendar, e.g., `113`) to filter out past semesters from the Google Calendar sync, preventing irrelevant historical data from being imported.
+Set `ENROLLMENT_YEAR` (ROC year, e.g., `113`) to filter historical semesters from Google Calendar sync. Only semesters from this year onward are imported.
 
 ---
 
@@ -196,8 +209,10 @@ Click the **Theme Icon** in the navbar:
 
 | Issue | Solution |
 |---|---|
-| CSV import shows 0 results | Check that your CSV uses the correct field names and UTF-8 encoding |
-| Class sessions show wrong times | Verify the semester start date is correct and matches the weekday |
-| Notion databases show "未設置" | Click Sync Status, then restart Docker |
-| N8N workflows not loading | Verify `N8N_API_KEY` is set in System Settings |
-| Force Execute fails | Upgrade to n8n v1.x or use a Webhook trigger node |
+| CSV import shows 0 results | Check field names match the template exactly; use UTF-8 encoding |
+| Class sessions show wrong dates | Verify semester start date matches the actual weekday |
+| Notion databases show "未設置" | Click Sync Status, restart Docker to apply saved IDs |
+| N8N workflows not loading | Enter `N8N_API_KEY` in System Admin → System Settings |
+| Force Execute fails with 404 | This n8n version doesn't support `/run` API — add a Webhook node instead |
+| NDHU Tasks disconnected after restart | Delete `config/token.json` and reconnect from Dashboard |
+| Google Classroom token expired | Delete `config/google_token.pickle` and click Connect Classroom |

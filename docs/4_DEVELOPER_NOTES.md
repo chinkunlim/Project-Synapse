@@ -97,6 +97,41 @@ processor.find_database_by_title(title)
 | `utils/errors.py` | Global error handler with Trace IDs |
 | `config/course_schedule_config.py` | 14 class periods + semester database |
 
+### API Routes Reference
+
+| Route | Method | Blueprint | Purpose |
+|---|---|---|---|
+| `/` | GET | main | Dashboard |
+| `/admin` | GET | main | System Settings UI |
+| `/classroom` | GET | classroom | Google Classroom UI |
+| `/notion` | GET | notion | Notion Admin UI |
+| `/thesis` | GET | main | Thesis Compilation UI |
+| `/n8n` | GET | n8n | Automation Hub UI |
+| `/docs` | GET | main | Documentation viewer |
+| `/api/status` | GET | main | System status JSON |
+| `/api/admin/env` | GET | main | Read `.env` variables |
+| `/api/admin/env/update` | POST | main | Update `.env` variable |
+| `/api/notion/csv/upload` | POST | notion | CSV import |
+| `/api/notion/csv/sample/<type>` | GET | notion | Download sample CSV |
+| `/api/notion/setup` | POST | notion | DB setup / sync |
+| `/api/notion/action` | POST | notion | Notion actions (init, reset) |
+| `/api/notion/env/all` | GET | notion | List all Notion env vars |
+| `/api/n8n/workflows` | GET | n8n | List N8N workflows |
+| `/api/n8n/execute/<id>` | POST | n8n | Execute N8N workflow |
+| `/api/classroom/auth/start` | GET | classroom | Start Classroom OAuth |
+| `/api/classroom/auth/callback` | GET | classroom | Classroom OAuth callback |
+| `/api/classroom/courses` | GET | classroom | List courses |
+| `/api/classroom/students/<id>` | GET | classroom | List students |
+| `/api/classroom/topics/create` | POST | classroom | Create topics |
+| `/api/ndhu/auth/start` | GET | ndhu | Start NDHU Tasks OAuth |
+| `/api/ndhu/auth/callback` | GET | ndhu | NDHU OAuth callback |
+| `/api/ndhu/auth/reset` | POST | ndhu | Clear NDHU token |
+| `/api/ndhu/tasks` | GET | ndhu | Get NDHU tasks |
+| `/api/ndhu/tasks/create` | POST | ndhu | Create task |
+| `/api/ndhu/tasks/complete` | POST | ndhu | Mark task complete |
+| `/thesis/convert` | POST | main | Compile Markdown → PDF |
+| `/student/submit` | POST | main | Student submission endpoint |
+
 ---
 
 ## 4. Extension Cookbook

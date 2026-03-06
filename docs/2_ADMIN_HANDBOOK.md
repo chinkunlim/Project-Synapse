@@ -20,11 +20,13 @@ Project Synapse uses a **microservice-lite** architecture:
 
 ### Containers
 
-| Container | Port | Purpose |
-|---|---|---|
-| `dashboard` | 5003 | Main Flask web application |
-| `n8n` | 5678 | Automation workflows |
-| `pdf-worker` | 5002 | LaTeX → PDF compilation |
+| Container | External Port | Internal Port | Purpose |
+|---|---|---|---|
+| `dashboard` | 5003 | 5001 | Main Flask web application |
+| `n8n` | 5678 | 5678 | Automation workflows |
+| `pdf-worker` | 5002 | 5001 | LaTeX → PDF compilation |
+
+> The Flask app runs on internal port **5001** inside Docker and is exposed as **5003** externally. Some OAuth callback URLs hardcoded in `ndhu_routes.py` reference port `5001` — update these if port mapping changes.
 
 ### Key Directories
 
@@ -80,13 +82,16 @@ Auto-populated by the Sync Status feature:
 | `RESOURCE_DATABASE_ID` | Resources |
 | `THEORY_HUB_ID` | Theory Hub |
 
-### Other Settings
+### Google Credential Files
 
-| Variable | Description |
-|---|---|
-| `ENROLLMENT_YEAR` | ROC year of enrollment (e.g., `113`). Filters past semesters in Calendar sync. |
-| `N8N_BASE_URL` | Internal Docker URL: `http://n8n:5678` |
-| `N8N_API_KEY` | API key generated from N8N Settings → API |
+| File | Service | Notes |
+|---|---|---|
+| `config/google_credentials.json` | Google Classroom + Drive | OAuth 2.0 client (Web Application type) |
+| `config/google_credential_ndhu.json` | NDHU Google Tasks | Separate OAuth 2.0 client (Web Application type) |
+| `config/google_token.pickle` | Classroom | Auto-saved OAuth token |
+| `config/token.json` | NDHU Tasks | Auto-saved OAuth token |
+
+> **Security**: All 4 files above are in `.gitignore`. Never commit them. Set `chmod 600` on each file.
 
 ---
 

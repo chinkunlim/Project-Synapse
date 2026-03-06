@@ -28,11 +28,11 @@ cd Project-Synapse
 ### Step 2: Configure Environment Variables
 Create a `.env` file at the project root:
 ```env
-# Notion
+# ── Notion ──────────────────────────────────
 NOTION_API_KEY=your_integration_token
 PARENT_PAGE_ID=your_parent_page_id
 
-# Databases (auto-filled after first sync)
+# ── Databases (auto-filled after first Sync Status) ─
 COURSE_HUB_ID=
 CLASS_SESSION_ID=
 TASK_DATABASE_ID=
@@ -40,12 +40,15 @@ NOTE_DATABASE_ID=
 RESOURCE_DATABASE_ID=
 THEORY_HUB_ID=
 
-# Settings
+# ── Academic Settings ───────────────────────
 ENROLLMENT_YEAR=114
 
-# N8N
+# ── N8N Automation ──────────────────────────
 N8N_BASE_URL=http://n8n:5678
 N8N_API_KEY=
+
+# ── Google OAuth (optional, local dev only) ─
+OAUTHLIB_INSECURE_TRANSPORT=1
 ```
 
 > **How to get `PARENT_PAGE_ID`**: Open your Notion page in the browser. The last 32-character segment of the URL is the page ID.
@@ -103,13 +106,10 @@ The dashboard will be available at **http://localhost:5003**.
 1. Visit [console.cloud.google.com](https://console.cloud.google.com)
 2. Enable: **Google Classroom API** and **Google Drive API**
 
-### Step 2: OAuth Credentials
-1. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
-2. Application type: **Web Application**
-3. Authorized redirect URI: `http://localhost:5003/api/classroom/auth/callback`
-4. Download the JSON → rename to `google_credentials.json` → place in `config/`
-
-### Step 3: Required OAuth Scopes
+### Step 2: OAuth Consent Screen
+1. Go to **APIs & Services → OAuth consent screen**
+2. Select **External** user type
+3. Add the following scopes:
 ```
 https://www.googleapis.com/auth/classroom.courses.readonly
 https://www.googleapis.com/auth/classroom.rosters.readonly
@@ -118,8 +118,13 @@ https://www.googleapis.com/auth/classroom.courseworkmaterials
 https://www.googleapis.com/auth/classroom.coursework.me
 https://www.googleapis.com/auth/drive.file
 ```
+4. Under **Test users**, add your Google account email address
 
-> **Local HTTP issue**: Add `OAUTHLIB_INSECURE_TRANSPORT=1` to `.env` for local development with HTTP callbacks.
+### Step 3: Create OAuth 2.0 Client
+1. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+2. Application type: **Web Application**
+3. Authorized redirect URI: `http://localhost:5003/api/classroom/auth/callback`
+4. Download the JSON → rename to `google_credentials.json` → place in `config/`
 
 ### Step 4: First-Time Authentication
 1. Go to `http://localhost:5003/classroom`
@@ -129,15 +134,33 @@ https://www.googleapis.com/auth/drive.file
 
 ---
 
-## 6. Troubleshooting
+## 6. NDHU Tasks (Google Tasks) Setup
+
+The NDHU Tasks integration uses a **separate** OAuth client from Classroom.
+
+1. In Google Cloud Console, create a **second** OAuth 2.0 Client ID (Web Application type)
+2. Authorized redirect URI: `http://localhost:5001/api/ndhu/auth/callback`
+   > Note: The NDHU callback uses port `5001` (internal Flask port). If running outside Docker, use `5003`.
+3. Download the JSON → rename to `google_credential_ndhu.json` → place in `config/`
+4. Required scopes:
+   ```
+   https://www.googleapis.com/auth/tasks
+   ```
+5. Authenticate from the **Dashboard** page via the NDHU Tasks connect button
+
+---
+
+## 7. Troubleshooting
 
 | Problem | Solution |
 |---|---|
 | Dashboard not loading | Check `docker ps` — ensure all 3 containers are running |
 | Notion databases not found | Re-share the parent page with your integration (include sub-pages) |
-| Database IDs lost after rebuild | After Docker restart, go to Notion Admin and click **Sync Status** |
+| Database IDs lost after rebuild | Go to Notion Admin → Sync Status, then restart Docker |
 | Google Classroom auth fails | Delete `config/google_token.pickle` and re-authenticate |
-| N8N not accessible in Safari | Ensure `N8N_SECURE_COOKIE=false` is in docker-compose.yml |
+| NDHU Tasks auth fails | Delete `config/token.json` and re-authenticate from Dashboard |
+| N8N not accessible in Safari | Ensure `N8N_SECURE_COOKIE=false` is in `docker-compose.yml` |
+| Port 5678 access denied in browser | Visit `http://localhost:5678` not `5003/n8n` for N8N admin UI |
 
 ---
 
