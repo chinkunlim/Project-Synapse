@@ -57,37 +57,55 @@ def list_workflows():
 def execute_workflow(id):
     api_key = get_n8n_api_key()
     base_url = get_n8n_url()
-    
-    # N8N API: POST /workflows/{id}/activate (This just activates, doesn't run one-off usually)
-    # To run, usually we use webhook or specific endpoint if available.
-    # However, N8N API has /executions/test logic or we can activate.
-    # User asked "Click to execute".
-    # Best way without webhook knowledge: 
-    # Try to find a webhook in the workflow? Too complex.
-    # Actually, activating it is one thing. Manual execution via API is: 
-    # POST /workflows/{id}/activate (True) -> this just turns it on.
-    
-    # N8N API v1 doesn't have a simple "Run Now" for any workflow unless it has a webhook.
-    # BUT, we can use the "test" functionality if exposed, or just activate it.
-    # Let's assume the user wants to ACTIVATE it? 
-    # "點擊就會執行該工作流" -> Implies "Run Once".
-    # With standard N8N API, we can't trigger a random workflow unless it has a Webhook node.
-    # If it has a webhook node, we need to know the path.
-    # Strategy: Just Activate it for now, OR return a message saying "Only Webhook flows can be triggered".
-    
-    # Update: N8N API allows activating.
+
+    if not api_key:
+        return jsonify({"status": "error", "message": "N8N_API_KEY not set. Please configure it in System Settings."})
+
+    headers = {"X-N8N-API-KEY": api_key}
+
     try:
-        # Toggle activation strictly?
-        # Let's try to activate it (True).
-        resp = requests.post(
-             f"{base_url}/api/v1/workflows/{id}/activate",
-            headers={"X-N8N-API-KEY": api_key},
-            json={"active": True},
-            timeout=5
-        )
-        if resp.status_code == 200:
-             return jsonify({"status": "success", "message": "Workflow activated."})
+        # Step 1: Fetch workflow details to find its trigger type
+        resp = requests.get(f"{base_url}/api/v1/workflows/{id}", headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return jsonify({"status": "error", "message": f"Cannot fetch workflow: {resp.status_code} {resp.text}"})
+
+        workflow = resp.json()
+        nodes = workflow.get("nodes", [])
+
+        # Step 2: Find webhook nodes
+        webhook_nodes = [n for n in nodes if "webhook" in n.get("type", "").lower()]
+
+        if webhook_nodes:
+            # Get the webhook path from the first webhook node
+            webhook_path = webhook_nodes[0].get("parameters", {}).get("path", "")
+            if webhook_path:
+                # Call the production webhook URL
+                webhook_url = f"{base_url}/webhook/{webhook_path}"
+                trigger_resp = requests.post(webhook_url, json={}, timeout=10)
+                if trigger_resp.status_code in (200, 201):
+                    return jsonify({"status": "success", "message": f"✅ Webhook triggered successfully (HTTP {trigger_resp.status_code})"})
+                else:
+                    # Try test webhook as fallback
+                    test_webhook_url = f"{base_url}/webhook-test/{webhook_path}"
+                    trigger_resp2 = requests.post(test_webhook_url, json={}, timeout=10)
+                    if trigger_resp2.status_code in (200, 201):
+                        return jsonify({"status": "success", "message": f"✅ Test webhook triggered (HTTP {trigger_resp2.status_code}). Note: Activate the workflow for production."})
+                    return jsonify({"status": "error", "message": f"Webhook call failed: {trigger_resp.status_code}. Make sure the workflow is Active."})
+            else:
+                return jsonify({"status": "warning", "message": "⚠️ Webhook node found but path is not set. Please configure the webhook path in n8n."})
+
+        # Step 3: No webhook — check for schedule or manual trigger
+        trigger_types = [n.get("type", "") for n in nodes]
+        has_schedule = any("schedule" in t.lower() or "cron" in t.lower() for t in trigger_types)
+        has_manual = any("manualTrigger" in t for t in trigger_types)
+
+        if has_schedule:
+            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Schedule trigger. It runs automatically at the configured time. To run it now, open n8n and use the ▶ Execute button."})
+        elif has_manual:
+            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Manual Trigger. Please open n8n to run it manually (it cannot be triggered remotely without a Webhook node)."})
         else:
-             return jsonify({"status": "error", "message": f"Failed: {resp.text}"})
+            return jsonify({"status": "info", "message": f"ℹ️ Trigger types: {trigger_types}. Only Webhook-triggered workflows can be run from this dashboard."})
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
