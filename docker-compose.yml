@@ -1,7 +1,7 @@
 services:
   # Project Synapse Dashboard
   dashboard:
-    container_name: antigravity
+    container_name: dashboard
     build: .
     ports:
       - "5003:5001"
