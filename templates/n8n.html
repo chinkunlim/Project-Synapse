@@ -65,8 +65,8 @@
                     };
                     const triggerBadge = `<span class="badge bg-light text-muted border rounded-pill small">${triggerIcons[triggerType] || triggerType}</span>`;
 
-                    // Only show Execute button for webhook workflows
-                    const executeBtn = triggerType === 'webhook'
+                    // Show Execute button for webhook AND manual trigger workflows
+                    const executeBtn = (triggerType === 'webhook' || triggerType === 'manual')
                         ? `<button class="btn btn-outline-danger btn-sm rounded-pill py-2" onclick="executeWorkflow('${wf.id}', '${wf.name}')">
                                 <i class="fa-solid fa-play me-2"></i> Run Now <span class="small ms-1">執行</span>
                            </button>`

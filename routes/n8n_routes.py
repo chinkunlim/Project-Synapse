@@ -124,9 +124,14 @@ def execute_workflow(id):
         if has_schedule:
             return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Schedule trigger and cannot be force-run via API. 💡 Tip: Add a Webhook node alongside the Schedule node in n8n — then this button will trigger it instantly."})
         elif has_manual:
-            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Manual Trigger. Please open n8n to run it manually (it cannot be triggered remotely without a Webhook node)."})
+            # Try n8n's manual run API endpoint
+            run_resp = requests.post(f"{base_url}/api/v1/workflows/{id}/run", headers=headers, json={}, timeout=10)
+            if run_resp.status_code in (200, 201):
+                return jsonify({"status": "success", "message": "✅ Workflow executed successfully via Manual Trigger."})
+            else:
+                return jsonify({"status": "error", "message": f"❌ Could not execute workflow (HTTP {run_resp.status_code}). This n8n version may not support remote manual execution. Please run it from the n8n UI."})
         else:
-            return jsonify({"status": "info", "message": f"ℹ️ Trigger types: {trigger_types}. Only Webhook-triggered workflows can be run from this dashboard."})
+            return jsonify({"status": "info", "message": f"ℹ️ Trigger types: {trigger_types}. Only Webhook and Manual Trigger workflows can be run from this dashboard."})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
