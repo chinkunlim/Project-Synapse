@@ -65,16 +65,17 @@
                     };
                     const triggerBadge = `<span class="badge bg-light text-muted border rounded-pill small">${triggerIcons[triggerType] || triggerType}</span>`;
 
-                    // Show Execute button for webhook AND manual trigger workflows
-                    const executeBtn = (triggerType === 'webhook' || triggerType === 'manual')
-                        ? `<button class="btn btn-outline-danger btn-sm rounded-pill py-2" onclick="executeWorkflow('${wf.id}', '${wf.name}')">
-                                <i class="fa-solid fa-play me-2"></i> Run Now <span class="small ms-1">執行</span>
-                           </button>`
-                        : `<div class="text-center py-1">
-                                <small class="text-muted"><i class="fa-regular fa-clock me-1"></i>
-                                ${triggerType === 'schedule' ? 'Runs on schedule automatically' : 'Run from n8n UI'}
-                                </small>
-                           </div>`;
+                    // All workflow types show an execute button
+                    // Webhook/Manual → "Execute Now", Schedule → "Force Execute"
+                    const isSchedule = triggerType === 'schedule';
+                    const btnLabel = isSchedule
+                        ? `<i class="fa-solid fa-bolt me-2"></i> Force Execute <span class="small ms-1">強制執行</span>`
+                        : `<i class="fa-solid fa-play me-2"></i> Execute Now <span class="small ms-1">執行</span>`;
+                    const btnClass = isSchedule
+                        ? 'btn btn-outline-warning btn-sm rounded-pill py-2'
+                        : 'btn btn-outline-danger btn-sm rounded-pill py-2';
+                    const executeBtn = `<button class="${btnClass}" onclick="executeWorkflow('${wf.id}', '${wf.name}')">${btnLabel}</button>`;
+
 
                     const col = document.createElement('div');
                     col.className = 'col-md-6 col-lg-4 mb-4';

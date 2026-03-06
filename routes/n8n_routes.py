@@ -116,22 +116,13 @@ def execute_workflow(id):
             else:
                 return jsonify({"status": "warning", "message": "⚠️ Webhook node found but path is not set. Please configure the webhook path in n8n."})
 
-        # Step 3: No webhook — check for schedule or manual trigger
-        trigger_types = [n.get("type", "") for n in nodes]
-        has_schedule = any("schedule" in t.lower() or "cron" in t.lower() for t in trigger_types)
-        has_manual = any("manualTrigger" in t for t in trigger_types)
-
-        if has_schedule:
-            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Schedule trigger and cannot be force-run via API. 💡 Tip: Add a Webhook node alongside the Schedule node in n8n — then this button will trigger it instantly."})
-        elif has_manual:
-            # Try n8n's manual run API endpoint
-            run_resp = requests.post(f"{base_url}/api/v1/workflows/{id}/run", headers=headers, json={}, timeout=10)
-            if run_resp.status_code in (200, 201):
-                return jsonify({"status": "success", "message": "✅ Workflow executed successfully via Manual Trigger."})
-            else:
-                return jsonify({"status": "error", "message": f"❌ Could not execute workflow (HTTP {run_resp.status_code}). This n8n version may not support remote manual execution. Please run it from the n8n UI."})
+        # Step 3: For all other trigger types, try POST /run to force execution
+        # (works for schedule, manual, and any other trigger type in newer n8n versions)
+        run_resp = requests.post(f"{base_url}/api/v1/workflows/{id}/run", headers=headers, json={}, timeout=10)
+        if run_resp.status_code in (200, 201):
+            return jsonify({"status": "success", "message": "✅ Workflow executed successfully."})
         else:
-            return jsonify({"status": "info", "message": f"ℹ️ Trigger types: {trigger_types}. Only Webhook and Manual Trigger workflows can be run from this dashboard."})
+            return jsonify({"status": "error", "message": f"❌ Could not execute workflow (HTTP {run_resp.status_code}: {run_resp.text[:200]}). Please try running it from the n8n UI."})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
