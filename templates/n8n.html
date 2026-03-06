@@ -51,28 +51,48 @@
             if (data.status === 'success' && data.workflows.length > 0) {
                 data.workflows.forEach(wf => {
                     const isActive = wf.active;
+                    const triggerType = wf.trigger_type || 'other';
+
                     const statusBadge = isActive
                         ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="fa-solid fa-circle-check me-1"></i> Active</span>'
                         : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill"><i class="fa-regular fa-circle-stop me-1"></i> Inactive</span>';
+
+                    const triggerIcons = {
+                        'webhook': '<i class="fa-solid fa-bolt text-danger me-1"></i> Webhook',
+                        'schedule': '<i class="fa-regular fa-clock text-info me-1"></i> Schedule',
+                        'manual': '<i class="fa-solid fa-hand-pointer text-warning me-1"></i> Manual',
+                        'other': '<i class="fa-solid fa-gear text-muted me-1"></i> Other'
+                    };
+                    const triggerBadge = `<span class="badge bg-light text-muted border rounded-pill small">${triggerIcons[triggerType] || triggerType}</span>`;
+
+                    // Only show Execute button for webhook workflows
+                    const executeBtn = triggerType === 'webhook'
+                        ? `<button class="btn btn-outline-danger btn-sm rounded-pill py-2" onclick="executeWorkflow('${wf.id}', '${wf.name}')">
+                                <i class="fa-solid fa-play me-2"></i> Run Now <span class="small ms-1">執行</span>
+                           </button>`
+                        : `<div class="text-center py-1">
+                                <small class="text-muted"><i class="fa-regular fa-clock me-1"></i>
+                                ${triggerType === 'schedule' ? 'Runs on schedule automatically' : 'Run from n8n UI'}
+                                </small>
+                           </div>`;
 
                     const col = document.createElement('div');
                     col.className = 'col-md-6 col-lg-4 mb-4';
                     col.innerHTML = `
                         <div class="card h-100 shadow-sm border-0 position-relative workflow-card">
                             <div class="card-body p-4 d-flex flex-column">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
                                     ${statusBadge}
                                     <small class="text-muted font-monospace bg-light px-2 rounded">#${wf.id.substring(0, 6)}</small>
                                 </div>
-                                <h5 class="card-title fw-bold text-dark mb-2">${wf.name}</h5>
+                                <h5 class="card-title fw-bold text-dark mb-1">${wf.name}</h5>
+                                <div class="mb-3">${triggerBadge}</div>
                                 <p class="card-text text-muted small mb-4 flex-grow-1"><i class="fa-regular fa-clock me-1"></i> Updated: ${new Date(wf.updatedAt).toLocaleDateString()}</p>
-                                
+
                                 <div class="d-grid gap-2 mt-auto">
-                                     <button class="btn btn-outline-danger btn-sm rounded-pill py-2" onclick="executeWorkflow('${wf.id}', '${wf.name}')">
-                                        <i class="fa-solid fa-play me-2"></i> Run Workflow <span class="small ms-1">執行</span>
-                                    </button>
+                                    ${executeBtn}
                                     <a href="http://localhost:5678/workflow/${wf.id}" target="_blank" class="btn btn-light btn-sm text-secondary rounded-pill py-2">
-                                        <i class="fa-solid fa-up-right-from-square me-2"></i> Editor <span class="small ms-1">編輯</span>
+                                        <i class="fa-solid fa-up-right-from-square me-2"></i> Open in n8n <span class="small ms-1">編輯</span>
                                     </a>
                                 </div>
                             </div>
@@ -82,6 +102,7 @@
                 });
 
                 window.synapseConsole.log(`Loaded ${data.workflows.length} workflows from N8N.`, 'success');
+
             } else {
                 listDiv.innerHTML = `
                     <div class="col-12 text-center py-5">

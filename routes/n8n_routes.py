@@ -42,11 +42,33 @@ def list_workflows():
         
         if resp.status_code == 200:
             data = resp.json()
+            workflows = []
+            for wf in data.get('data', []):
+                # Detect trigger type from nodes
+                nodes = wf.get('nodes', [])
+                node_types = [n.get('type', '').lower() for n in nodes]
+                has_webhook  = any('webhook' in t for t in node_types)
+                has_schedule = any('schedule' in t or 'cron' in t or 'interval' in t for t in node_types)
+                has_manual   = any('manualtrigger' in t for t in node_types)
+
+                if has_webhook:
+                    trigger_type = 'webhook'
+                elif has_schedule:
+                    trigger_type = 'schedule'
+                elif has_manual:
+                    trigger_type = 'manual'
+                else:
+                    trigger_type = 'other'
+
+                wf['trigger_type'] = trigger_type
+                workflows.append(wf)
+
             return jsonify({
-                "status": "success", 
-                "workflows": data.get('data', []),
-                "n8n_url": get_n8n_url() # For frontend links (might need external URL)
+                "status": "success",
+                "workflows": workflows,
+                "n8n_url": get_n8n_url()
             })
+
         else:
              return jsonify({"status": "error", "message": f"N8N Error: {resp.status_code} {resp.text}"})
              
@@ -100,7 +122,7 @@ def execute_workflow(id):
         has_manual = any("manualTrigger" in t for t in trigger_types)
 
         if has_schedule:
-            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Schedule trigger. It runs automatically at the configured time. To run it now, open n8n and use the ▶ Execute button."})
+            return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Schedule trigger and cannot be force-run via API. 💡 Tip: Add a Webhook node alongside the Schedule node in n8n — then this button will trigger it instantly."})
         elif has_manual:
             return jsonify({"status": "info", "message": "ℹ️ This workflow uses a Manual Trigger. Please open n8n to run it manually (it cannot be triggered remotely without a Webhook node)."})
         else:
