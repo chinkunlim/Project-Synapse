@@ -75,50 +75,8 @@ class NotionProcessor:
                 schema = json.load(f)
             
             db_schemas = schema.get("databases", [])
-            created_databases = {}
-            
-            for db_schema in tqdm(db_schemas, desc="建立系統資料庫", unit="個"):
-                db_name = db_schema.get("db_name")
-                if not db_name: continue
-                
-                properties = {k: v for k, v in db_schema.get("properties", {}).items() if "relation_placeholder" not in v}
-                db_title = db_schema.get("title", db_name)
-                
-                db_data = self.client.create_database(parent_page_id, db_title, properties)
-                if db_data:
-                    new_db_id = db_data.get("id")
-                    created_databases[db_name] = new_db_id
-                    
-                    env_key = db_schema.get("env_key")
-                    key_mapping = {
-                        "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",   # v3.0 對應
-                        "COURSE_DATABASE_ID": "CLASS_SESSION_ID", # v3.0 對應
-                        "NOTE_DB_ID": "NOTE_DATABASE_ID",
-                        "THEORY_DB_ID": "THEORY_HUB_ID",
-                        "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
-                        "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID"
-                    }
-                    if env_key in key_mapping: env_key = key_mapping[env_key]
-                    if env_key: notion_config.set_env(env_key, new_db_id)
-            
-            for db_schema in db_schemas:
-                db_name = db_schema.get("db_name")
-                current_db_id = created_databases.get(db_name)
-                if not current_db_id: continue
-                
-                relation_properties = {}
-                for prop_name, prop_details in db_schema.get("properties", {}).items():
-                    if "relation_placeholder" in prop_details:
-                        target_db_name = prop_details["relation_placeholder"].get("db_name")
-                        target_db_id = created_databases.get(target_db_name)
-                        if target_db_id:
-                            relation_properties[prop_name] = {
-                                "relation": {"database_id": target_db_id, "type": "dual_property", "dual_property": {}}
-                            }
-                
-                if relation_properties:
-                    self.client._send_request("PATCH", f"databases/{current_db_id}", {"properties": relation_properties})
-            return True
+            db_ids = self._create_databases_logic(parent_page_id, db_schemas)
+            return bool(db_ids)
         except Exception as e:
             logger.error(f"資料庫建立錯誤: {e}")
             return False
@@ -265,13 +223,29 @@ class NotionProcessor:
         if not parent_page_id: return False
         
         guide_blocks = [
-            {"object": "block", "type": "callout", "callout": {"rich_text": [{"type": "text", "text": {"content": "歡迎使用！原始資料庫存放於 [System] Archive。Dashboard 內容皆為動態視圖。"}}]}},
-            {"object": "block", "type": "heading_2", "heading_2": {"rich_text": [{"type": "text", "text": {"content": "🧠 筆記模板選用指南"}}]}},
-            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "1. Cornell (康乃爾筆記法) —— 適合期末考前大量複習的理論課"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "特色：強迫將記錄與提取分開。右側記錄，左側寫提示問題，底部總結。"}}]}}]}},
-            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "2. QEC (提問-證據-結論) —— 適合實驗分析與文獻選讀"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "特色：培養批判性思考。列出 Question, Evidence, Conclusion。"}}]}}]}},
-            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "3. Feynman (費曼學習法) —— 適合極度抽象難懂的硬核知識"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "特色：用教導驗證理解。用白話文解釋，卡住的地方就是知識漏洞。"}}]}}]}},
-            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "4. Outline (階層大綱式) —— 適合資訊量大、節奏極快的課"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "特色：排版最快，迅速捕捉資訊骨架。"}}]}}]}},
-            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "5. Lecture (標準課堂型) —— 適合一般通識或專題討論"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "特色：以行動為導向。記錄評分標準、繳交期限與 Action Items。"}}]}}]}}
+            {"object": "block", "type": "callout", "callout": {"rich_text": [{"type": "text", "text": {"content": "歡迎使用 Project-Synapse！本系統包含七大核心資料庫，透過雙向關聯自動串接所有學習資訊。Dashboard 內容皆為動態視圖，原始資料庫存放於 [System] Archive。"}}], "color": "blue_background"}},
+            {"object": "block", "type": "divider", "divider": {}},
+            {"object": "block", "type": "heading_2", "heading_2": {"rich_text": [{"type": "text", "text": {"content": "🗄️ 資料庫功能說明 (Databases)"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Course Hub (課程大廳)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：總管所有註冊班級、學分、教授資訊與學期成績。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Class Sessions (課程會話)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：記錄每一堂（每週）課的具體進度與出席狀況。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Lecture Notes (筆記庫)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：存放所有課堂筆記，並支援套用多種筆記模板。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Theory Hub (理論庫)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：歸納與整理跨課程的核心理論、公式與硬核知識點。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Projects (專案庫)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：追蹤與管理大型期末報告、專題研究及長期目標。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Resources (資源庫)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：統一存放參考書目、講義檔案、網路教材與文獻連結。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "Tasks (任務庫)"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：統籌所有的作業、考試及個人待辦事項 (Action Items)。"}}]}},
+            {"object": "block", "type": "divider", "divider": {}},
+            {"object": "block", "type": "heading_2", "heading_2": {"rich_text": [{"type": "text", "text": {"content": "🔗 資料庫關聯指南 (Relationships)"}}]}},
+            {"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "系統的核心在於自動化跨資料庫關聯，您在建立資料時可以遵循以下邏輯："}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "以「課程」為中心"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：所有的筆記、任務、專案、資源都可以（也應該）關聯回到特定的 "}}, {"type": "text", "text": {"content": "Course Hub"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": "，這樣進入特定課程頁面時就能一次看見所有相關內容。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "當堂筆記與作業"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：在 "}}, {"type": "text", "text": {"content": "Class Sessions"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": " 內可同步建立當天的 "}}, {"type": "text", "text": {"content": "Lecture Notes"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": " 和延伸出來的 "}}, {"type": "text", "text": {"content": "Tasks"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": "。"}}]}},
+            {"object": "block", "type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "理論與資源支撐"}, "annotations": {"bold": True}}, {"type": "text", "text": {"content": "：遇到難懂的概念，可獨立寫入 "}}, {"type": "text", "text": {"content": "Theory Hub"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": "，並在筆記庫中 @ 關聯它；參考資料則存入 "}}, {"type": "text", "text": {"content": "Resources"}, "annotations": {"code": True}}, {"type": "text", "text": {"content": " 供專案與任務提取。"}}]}},
+            {"object": "block", "type": "divider", "divider": {}},
+            {"object": "block", "type": "heading_2", "heading_2": {"rich_text": [{"type": "text", "text": {"content": "🧠 筆記模板選用指南 (Note Templates)"}}]}},
+            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "1. Cornell (康乃爾筆記法) —— 適合期末考前大量複習的理論課"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "特色：強迫將記錄與提取分開。右側記錄，左側寫提示問題，底部總結。"}}]}}]}},
+            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "2. QEC (提問-證據-結論) —— 適合實驗分析與文獻選讀"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "特色：培養批判性思考。列出 Question, Evidence, Conclusion。"}}]}}]}},
+            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "3. Feynman (費曼學習法) —— 適合極度抽象難懂的硬核知識"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "特色：用教導驗證理解。用白話文解釋，卡住的地方就是知識漏洞。"}}]}}]}},
+            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "4. Outline (階層大綱式) —— 適合資訊量大、節奏極快的課"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "特色：排版最快，迅速捕捉資訊骨架。"}}]}}]}},
+            {"object": "block", "type": "toggle", "toggle": {"rich_text": [{"type": "text", "text": {"content": "5. Lecture (標準課堂型) —— 適合一般通識或專題討論"}}], "children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "特色：以行動為導向。記錄評分標準、繳交期限與 Action Items。"}}]}}]}}
         ]
         
         try:
@@ -324,11 +298,58 @@ class NotionProcessor:
         return output.getvalue()
 
     def _convert_block_to_payload(self, block: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """轉換 Block 為佈局格式"""
+        """轉換 Block 為佈局格式，增加對子頁面、圖示與巢狀子區塊的支援"""
         b_type = block.get('type')
-        if not b_type or b_type == 'child_database': return None
+        if not b_type or b_type in ('child_database', 'child_page', 'unsupported'): return None
+        
         content = block.get(b_type, {})
-        return {"object": "block", "type": b_type, b_type: {"rich_text": content.get("rich_text", [])}}
+        payload = {"object": "block", "type": b_type, b_type: {}}
+
+        # 處理子頁面
+        if b_type == 'child_page':
+            payload[b_type] = {"title": content.get("title", "未命名頁面")}
+        
+        # 處理通用文字屬性
+        if "rich_text" in content:
+            payload[b_type]["rich_text"] = content.get("rich_text", [])
+        if "color" in content:
+            payload[b_type]["color"] = content.get("color")
+            
+        # 處理特定區塊的特別屬性
+        if b_type == 'callout' and "icon" in content:
+            payload[b_type]["icon"] = content["icon"]
+        if b_type == 'to_do' and "checked" in content:
+            payload[b_type]["checked"] = content["checked"]
+            
+        # 處理其他常見屬性
+        for attr in ["url", "expression", "caption", "type"]:
+            if attr in content:
+                payload[b_type][attr] = content[attr]
+
+        # 資源類型的處理 (image, video, file, pdf)
+        if b_type in ['image', 'video', 'file', 'pdf']:
+            if 'external' in content:
+                payload[b_type]['external'] = content['external']
+            elif 'file' in content:
+                # Notion API 限制無法直接複製託管的 file，此處先保留原始 URL，後續建立時未必成功
+                payload[b_type]['external'] = {"url": content['file'].get('url')}
+
+        # 遞迴處理子區塊 (支援 toggle, column_list, column 等巢狀結構)
+        if block.get("has_children"):
+            block_id = block.get("id")
+            if block_id:
+                # 這裡調用 client 去抓取子層級
+                child_blocks = self.client.get_block_children(block_id)
+                if child_blocks:
+                    children_payload = []
+                    for cb in child_blocks:
+                        converted = self._convert_block_to_payload(cb)
+                        if converted:
+                            children_payload.append(converted)
+                    if children_payload:
+                        payload[b_type]["children"] = children_payload
+                        
+        return payload
 
     def sync_notion_to_local_schema(self) -> bool:
         """同步資料庫結構 + 首頁佈局 (含拖入的子頁面)"""
@@ -341,15 +362,32 @@ class NotionProcessor:
                 schema = json.load(f)
 
             # 同步資料庫 (修正 v3.0 的 Key 映射)
-            key_map = {"SUBJECT_DATABASE_ID": "COURSE_HUB_ID", "COURSE_DATABASE_ID": "CLASS_SESSION_ID", 
-                       "NOTE_DB_ID": "NOTE_DATABASE_ID", "THEORY_DB_ID": "THEORY_HUB_ID"}
+            key_map = {
+                "SUBJECT_DATABASE_ID": "COURSE_HUB_ID", 
+                "COURSE_DATABASE_ID": "CLASS_SESSION_ID", 
+                "NOTE_DB_ID": "NOTE_DATABASE_ID", 
+                "THEORY_DB_ID": "THEORY_HUB_ID",
+                "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID", # 補上
+                "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID", # 補上
+                "TASK_DB_ID": "TASK_DATABASE_ID" # 補上
+            }
             
             for db in schema.get("databases", []):
                 actual_key = key_map.get(db.get("env_key"), db.get("env_key"))
                 db_id = notion_config.get_env(actual_key)
                 if db_id:
                     info = self.client.retrieve_database(db_id)
-                    if info: db["properties"] = {n: {v.get("type"): {}} for n, v in info.get("properties", {}).items()}
+                    if info: 
+                        new_props = {}
+                        for n, v in info.get("properties", {}).items():
+                            p_type = v.get("type")
+                            # If the original schema had relation_placeholder, preserve it for rebuilding
+                            orig_prop = db.get("properties", {}).get(n, {})
+                            if "relation_placeholder" in orig_prop:
+                                new_props[n] = {"relation_placeholder": orig_prop["relation_placeholder"]}
+                            else:
+                                new_props[n] = {p_type: {}}
+                        db["properties"] = new_props
 
             # 同步首頁佈局 (Layout) - 包含您拖入的頁面與新區塊
             blocks = self.client.get_block_children(parent_id)
@@ -406,17 +444,32 @@ class NotionProcessor:
     def _create_databases_logic(self, parent_id: str, db_configs: List[Dict]) -> Dict[str, str]:
         """私有方法：執行資料庫建立與雙向關聯設置"""
         created_dbs = {}
+        
+        # 建立 Archive 容器子頁面
+        logger.info("📁 正在建立 Database 存放資料庫...")
+        archive_page = self.client.create_page(parent_id, "Database")
+        archive_id = archive_page.get("id") if archive_page else parent_id
+        
         # 步驟 A: 建立基礎資料庫
         for db_cfg in db_configs:
             db_name = db_cfg.get("db_name")
-            props = {k: v for k, v in db_cfg.get("properties", {}).items() if "relation_placeholder" not in v}
-            res = self.client.create_database(parent_id, db_cfg.get("title", db_name), props)
+            props = {k: v for k, v in db_cfg.get("properties", {}).items() if "relation_placeholder" not in v and "relation" not in v}
+            res = self.client.create_database(archive_id, db_cfg.get("title", db_name), props)
             if res:
                 new_id = res.get("id")
                 created_dbs[db_name] = new_id
                 # 更新環境變數 (需對應 v3.0 的 Key)
                 env_key = db_cfg.get("env_key")
-                key_map = {"SUBJECT_DATABASE_ID": "COURSE_HUB_ID", "COURSE_DATABASE_ID": "CLASS_SESSION_ID", "NOTE_DB_ID": "NOTE_DATABASE_ID", "THEORY_DB_ID": "THEORY_HUB_ID"}
+                # 補全 6 個核心資料庫的映射
+                key_map = {
+                    "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",
+                    "COURSE_DATABASE_ID": "CLASS_SESSION_ID",
+                    "NOTE_DB_ID": "NOTE_DATABASE_ID",
+                    "THEORY_DB_ID": "THEORY_HUB_ID",
+                    "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
+                    "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID",
+                    "TASK_DB_ID": "TASK_DATABASE_ID"  # 確保包含 Task
+                }
                 actual_key = key_map.get(env_key, env_key)
                 if actual_key: notion_config.set_env(actual_key, new_id)
         
@@ -432,6 +485,60 @@ class NotionProcessor:
             if rel_props:
                 self.client._send_request("PATCH", f"databases/{db_id}", {"properties": rel_props})
         return created_dbs
+    
+    def find_database_by_title(self, title: str) -> Optional[str]:
+        """
+        透過標題搜尋資料庫，先嘗試從PARENT_PAGE_ID的所有子頁面中尋找，
+        找不到才降格到 Notion 搜尋 API（search）。
+        這樣可以確保即使資料庫位於巢狀子頁面中也能被找到。
+        """
+        import os
+        parent_page_id = os.getenv('PARENT_PAGE_ID', '')
+        
+        # 1. 先嘗試直接遍歷父頁面子孫
+        if parent_page_id:
+            db_id = self._find_db_in_children(parent_page_id, title, depth=2)
+            if db_id:
+                return db_id
+
+        # 2. 降格到全域搜尋 API
+        results = self.client.search(query=title, filter_type="database")
+        if results:
+            for db in results:
+                notion_title = "".join([t.get('plain_text', '') for t in db.get('title', [])])
+                if notion_title == title:
+                    return db.get('id')
+        return None
+
+    def _find_db_in_children(self, page_id: str, title: str, depth: int = 1) -> Optional[str]:
+        """
+        遞迴地在指定頁面的子區塊中尋找特定標題的資料庫。
+        depth 控制遞迴深度。
+        """
+        children = self.client.get_block_children(page_id)
+        if not children:
+            return None
+
+        sub_pages = []
+        for block in children:
+            btype = block.get('type')
+            bid = block.get('id')
+
+            if btype == 'child_database':
+                db_title = block.get('child_database', {}).get('title', '')
+                if db_title == title:
+                    return bid
+
+            elif btype == 'child_page' and depth > 0:
+                sub_pages.append(bid)
+
+        # 遞迴搜尋子頁面
+        for sub_id in sub_pages:
+            result = self._find_db_in_children(sub_id, title, depth=depth - 1)
+            if result:
+                return result
+
+        return None
 
 # 向後相容函式
 def execute_test_connection(api_key: str) -> bool: return NotionProcessor(api_key).test_connection()

@@ -48,7 +48,7 @@ class NotionApiClient:
         
         for attempt in range(retry_count):
             try:
-                logger.debug(f"🔄 發送請求 [{attempt + 1}/{retry_count}] | 方法: {method} | URL: {url}")
+                logger.debug(f"🔄 發送請求 [{attempt + 1}/{retry_count}] | 方法: {method} | URL: {url} | Payload: {payload}")
                 response = requests.request(method=method, url=url, headers=self.headers, json=payload, timeout=30)
                 response.raise_for_status()
                 logger.debug(f"✅ 請求成功: {response.status_code}")
@@ -56,7 +56,8 @@ class NotionApiClient:
                 
             except requests.exceptions.HTTPError as e:
                 status_code = e.response.status_code if e.response is not None else 'N/A'
-                logger.error(f"❌ HTTP 錯誤: {status_code}")
+                err_text = e.response.text if e.response is not None else 'N/A'
+                logger.error(f"❌ HTTP 錯誤: {status_code} - {err_text}")
                 if 400 <= status_code < 500:
                     return None
                 if attempt < retry_count - 1:
@@ -179,3 +180,16 @@ class NotionApiClient:
         
         logger.info(f"✅ 成功清理 {deleted_count}/{len(blocks)} 個區塊或資料庫")
         return deleted_count == len(blocks)
+
+    def search(self, query: str, filter_type: str = "database") -> Optional[List[Dict[str, Any]]]:
+        """
+        在 Notion 空間中搜尋特定名稱的物件（預設搜尋資料庫）
+        """
+        logger.info(f"🔍 正在 Notion 中搜尋: {query}")
+        payload = {
+            "query": query,
+            "filter": {"value": filter_type, "property": "object"},
+            "page_size": 5
+        }
+        response = self._send_request("POST", "search", payload)
+        return response.json().get('results', []) if response and response.status_code == 200 else None

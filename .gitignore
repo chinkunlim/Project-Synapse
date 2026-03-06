@@ -1,10 +1,19 @@
+# Secrets & credentials
 .env
-__pycache__/
-.DS_Store
-n8n_data/git*.pickle
-*.json
-!samples/
 config/google_*.json
 config/google_token*.pickle
+config/notion_config.ini
+
+# Caches & temp files
+__pycache__/
+.DS_Store
+*.pyc
+*.pyo
+.venv/
+
+# Logs & debug output
 logs/
 debug_output*.txt
+
+# Docker volumes
+n8n_data/

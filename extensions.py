@@ -1,8 +1,8 @@
 import os
 from notion_client import Client
-from intergrations.notion import NotionProcessor, setup_logging
-from utils.google_classroom_integration import GoogleClassroomIntegration
-from utils.google_ndhu_integration import GoogleNDHUIntegration
+from integrations.notion import NotionProcessor, setup_logging
+from integrations.google_classroom_integration import GoogleClassroomIntegration
+from integrations.google_ndhu_integration import GoogleNDHUIntegration
 from utils.logger import logger
 
 # Global Instances

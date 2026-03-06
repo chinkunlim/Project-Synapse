@@ -2,6 +2,7 @@
 from flask import Flask, request, Response
 import os
 from extensions import init_extensions
+from utils.errors import register_error_handlers
 from config.config import config
 from routes.main_routes import main_bp
 from routes.notion_routes import notion_bp
@@ -40,6 +41,9 @@ def create_app(config_name='default'):
     app.register_blueprint(thesis_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(n8n_bp)
+    
+    # Register Error Handlers
+    register_error_handlers(app)
     
     # Global Security Headers
     @app.after_request

@@ -9,7 +9,14 @@ from datetime import datetime
 sys.path.append(os.getcwd())
 
 # Mock logging to capture output
-sys.modules['intergrations.notion.logging'] = MagicMock()
+sys.modules['integrations.notion.logging'] = MagicMock()
+# ... skipping some lines
+real_logger = logging.getLogger("integrations.notion.processor")
+# ... 
+sys.modules['integrations.notion.logging'].get_logger.return_value = real_logger
+# ...
+sys.modules['integrations.notion.client'] = MagicMock()
+from integrations.notion.processor import NotionProcessor
 # Create a real logger to see output in console
 real_logger = logging.getLogger("intergrations.notion.processor")
 real_logger.setLevel(logging.INFO)

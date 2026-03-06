@@ -35,8 +35,8 @@ def initialize_notion_system():
     """新增：執行 Notion 系統層架構初始化與引導頁面生成"""
     print_header("6️⃣ 執行 Notion 系統架構初始化")
     
-    from intergrations.notion.processor import NotionProcessor
-    from intergrations.notion.config import notion_config
+    from integrations.notion.processor import NotionProcessor
+    from integrations.notion.config import notion_config
     
     # 確保系統層 ID 已設定
     system_page_id = os.environ.get("NOTION_PARENT_PAGE_ID") or notion_config.parent_page_id

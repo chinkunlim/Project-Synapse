@@ -78,17 +78,32 @@ async function runAction(actionName) {
         const response = await fetch('/api/notion/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 action: actionName,
                 version: version // 帶入版本選擇參數
             })
         });
 
-        const data = await response.json();
+        let data = await response.json();
 
-        if (response.ok && data.status === 'success') {
-            addLog(`✅ ${data.message}`, 'success');
-            
+        // Polling logic for async tasks
+        if (response.ok && data.status === 'processing') {
+            addLog(`⏳ ${data.message || '任務已在背景執行中...'}`, 'info');
+            const taskId = data.task_id;
+            while (true) {
+                await new Promise(r => setTimeout(r, 2000));
+                const pollRes = await fetch(`/api/tasks/${taskId}`);
+                const pollData = await pollRes.json();
+                if (pollData.status !== 'processing') {
+                    data = pollData;
+                    break;
+                }
+            }
+        }
+
+        if ((response.ok || data.status === 'success') && data.status !== 'error') {
+            addLog(`✅ ${data.message || '操作成功'}`, 'success');
+
             if (data.details) console.log("Details:", data.details);
             if (data.logs) {
                 data.logs.forEach(log => addLog(`   ${log}`, 'info'));

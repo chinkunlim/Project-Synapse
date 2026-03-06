@@ -4,6 +4,7 @@ import os
 import markdown
 import glob
 import extensions
+from utils.task_queue import get_task_status
 
 main_bp = Blueprint('main', __name__)
 
@@ -54,6 +55,13 @@ def index():
             print(f"NDHU 任務讀取失敗: {e}")
     
     return render_template('index.html', tasks=real_tasks, ndhu_tasks=ndhu_tasks)
+
+@main_bp.route('/api/tasks/<task_id>', methods=['GET'])
+def poll_task(task_id):
+    """
+    Retrieve the result of an asynchronous background task.
+    """
+    return jsonify(get_task_status(task_id))
 
 @main_bp.route('/trigger-n8n', methods=['POST'])
 def trigger_n8n():

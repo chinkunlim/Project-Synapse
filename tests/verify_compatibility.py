@@ -20,7 +20,7 @@ print("="*70)
 # 測試 1: 檢查舊函數是否存在
 print("\n【測試 1】檢查舊的函數接口是否存在...")
 try:
-    from intergrations.notion.processor import (
+    from integrations.notion.processor import (
         execute_test_connection,
         execute_build_dashboard_layout,
         execute_delete_blocks,
@@ -38,7 +38,7 @@ except ImportError as e:
 # 測試 2: 檢查新類是否存在
 print("\n【測試 2】檢查新的類接口是否存在...")
 try:
-    from intergrations.notion import (
+    from integrations.notion import (
         NotionProcessor,
         NotionApiClient,
         NotionConfig,
@@ -148,7 +148,7 @@ except AssertionError as e:
 # 測試 7: 檢查配置系統
 print("\n【測試 7】檢查配置系統...")
 try:
-    from intergrations.notion import notion_config
+    from integrations.notion import notion_config
     
     config_attrs = [
         'api_key',

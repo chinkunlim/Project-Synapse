@@ -40,7 +40,7 @@ def setup_logging():
         Logger: 初始化完成的日誌記錄器實例
     
     範例：
-        >>> from intergrations.notion.logging import setup_logging
+        >>> from integrations.notion.logging import setup_logging
         >>> logger = setup_logging()
         >>> logger.info("這是一則測試訊息")
     """

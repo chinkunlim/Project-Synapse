@@ -9,7 +9,7 @@ Notion 整合模組
 - setup_logging: 日誌配置
 
 使用範例:
-    from intergrations.notion import NotionProcessor, setup_logging
+    from integrations.notion import NotionProcessor, setup_logging
     
     # 初始化日誌
     setup_logging()

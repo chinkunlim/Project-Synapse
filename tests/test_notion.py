@@ -11,7 +11,7 @@ project_root = Path(__file__).resolve().parent
 sys.path.insert(0, str(project_root))
 
 from dotenv import load_dotenv
-from intergrations.notion import (
+from integrations.notion import (
     NotionProcessor,
     NotionConfig,
     notion_config,
@@ -126,7 +126,7 @@ def test_module_imports():
     print("="*60)
     
     try:
-        from intergrations.notion import (
+        from integrations.notion import (
             NotionConfig,
             notion_config,
             NotionApiClient,

@@ -132,7 +132,7 @@
 
     async function loadEnv() {
         try {
-            const res = await fetch('/api/admin/env');
+            const res = await fetch('/api/admin/env?t=' + new Date().getTime());
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
 
@@ -140,68 +140,69 @@
             container.innerHTML = '';
 
             if (data.status === 'success' && data.env) {
-                // Categorize keys for better UI
-                const categories = {
-                    'FLASK': ['FLASK_SECRET_KEY', 'FLASK_DEBUG'],
-                    'NOTION': ['NOTION_API_KEY', 'NOTION_PARENT_PAGE_ID', 'NOTION_DATABASE_ID'],
-                    'GOOGLE': ['GOOGLE_CLIENT_SECRETS_FILE', 'GOOGLE_CREDENTIALS_FILE'],
-                    'N8N': ['N8N_API_KEY', 'N8N_BASE_URL']
-                };
+                // Ensure ENROLLMENT_YEAR exists
+                if (!data.env.hasOwnProperty('ENROLLMENT_YEAR')) {
+                    data.env['ENROLLMENT_YEAR'] = '';
+                }
 
-                const allKeys = Object.keys(data.env);
+                // Explicitly map exactly what needs to be shown, NOTHING else.
+                const categories = {
+                    'SYSTEM': ['ENROLLMENT_YEAR'],
+                    'NOTION CONFIGURATION': ['NOTION_API_KEY', 'PARENT_PAGE_ID'],
+                    'OTHER SETTINGS': ['COURSE_HUB_ID', 'CLASS_SESSION_ID', 'TASK_DATABASE_ID', 'NOTE_DATABASE_ID', 'RESOURCE_DATABASE_ID', 'THEORY_HUB_ID', 'PROJECT_DATABASE_ID'],
+                    'N8N': ['N8N_API_KEY', 'N8N_BASE_URL'],
+                    'GOOGLE': ['GOOGLE_CLIENT_SECRETS_FILE', 'GOOGLE_CREDENTIALS_FILE'],
+                    'FLASK': ['FLASK_SECRET_KEY', 'FLASK_DEBUG']
+                };
 
                 const renderField = (key, value) => {
                     const col = document.createElement('div');
                     col.className = 'col-12';
-                    // Masking: Fixed length asterisks, store real value in generic data attribute
-                    const mask = '********************';
+                    const isMaskedKeys = ['FLASK_SECRET_KEY', 'NOTION_API_KEY', 'N8N_API_KEY'];
+                    const needsMask = isMaskedKeys.includes(key) || key.endsWith('_ID');
+                    const mask = needsMask && value ? '********************' : value;
+
+                    const labelHints = {
+                        'ENROLLMENT_YEAR': ' (e.g. 110 for 110學年度)'
+                    };
+                    const hintSpan = labelHints[key] ? `<span class="fw-normal text-muted">${labelHints[key]}</span>` : '';
+
                     col.innerHTML = `
-                         <label class="form-label small fw-bold text-secondary mb-1">${key}</label>
+                         <label class="form-label small fw-bold text-secondary mb-1">${key}${hintSpan}</label>
                          <div class="input-group">
                              <input type="text" class="form-control form-control-sm font-monospace bg-light border-0" 
                                     name="${key}" 
                                     value="${mask}" 
                                     data-real-value="${value}"
-                                    data-masked="true"
-                                    ${key === 'FLASK_DEBUG' ? '' : ''}
+                                    data-masked="${needsMask ? 'true' : 'false'}"
                                     oninput="this.dataset.masked = 'false'">
+                             ${needsMask ? `
                              <button class="btn btn-sm btn-light border-0 text-muted" type="button" 
                                      title="Toggle Visibility"
                                      onclick="toggleVisibility(this)">
                                  <i class="fa-regular fa-eye"></i>
                              </button>
+                             ` : ''}
                          </div>
                      `;
                     return col;
                 };
 
-                // Render categorized fields
+                // Render categorized fields strictly based on our explicit mappings
                 for (const [cat, keys] of Object.entries(categories)) {
-                    const catKeys = allKeys.filter(k => k.startsWith(cat) || keys.includes(k));
+                    // Only select exactly the keys defined for this category
+                    const catKeys = keys.filter(k => data.env.hasOwnProperty(k));
 
                     if (catKeys.length > 0) {
                         const header = document.createElement('div');
                         header.className = 'col-12 mt-4 mb-2';
-                        header.innerHTML = `<h6 class="border-bottom pb-2 text-primary small fw-bold text-uppercase d-flex align-items-center"><i class="fa-solid fa-layer-group me-2"></i> ${cat} Configuration</h6>`;
+                        header.innerHTML = `<h6 class="border-bottom pb-2 text-primary small fw-bold text-uppercase d-flex align-items-center"><i class="fa-solid fa-layer-group me-2"></i> ${cat}</h6>`;
                         container.appendChild(header);
 
                         catKeys.forEach(k => {
                             container.appendChild(renderField(k, data.env[k]));
-                            const idx = allKeys.indexOf(k);
-                            if (idx > -1) allKeys.splice(idx, 1);
                         });
                     }
-                }
-
-                // Render remaining keys
-                if (allKeys.length > 0) {
-                    const header = document.createElement('div');
-                    header.className = 'col-12 mt-4 mb-2';
-                    header.innerHTML = `<h6 class="border-bottom pb-2 text-primary small fw-bold text-uppercase d-flex align-items-center"><i class="fa-solid fa-layer-group me-2"></i> Other Settings</h6>`;
-                    container.appendChild(header);
-                    allKeys.forEach(k => {
-                        container.appendChild(renderField(k, data.env[k]));
-                    });
                 }
 
                 window.synapseConsole.log('Loaded environment variables.', 'success');

@@ -1,9 +1,10 @@
 services:
   # Project Synapse Dashboard
   dashboard:
+    container_name: antigravity
     build: .
     ports:
-      - "5001:5001"
+      - "5003:5001"
     volumes:
       - .:/app
     env_file:
@@ -16,6 +17,7 @@ services:
 
   # N8N 自動化服務
   n8n:
+    container_name: n8n
     image: n8nio/n8n
     ports:
       - "5678:5678"
@@ -29,6 +31,7 @@ services:
       - synapse-network
 
   pdf-worker:
+    container_name: pdf-worker
     build: ./pdf_service
     ports:
       - "5002:5002"

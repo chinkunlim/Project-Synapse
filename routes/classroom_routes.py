@@ -4,6 +4,8 @@ import pandas as pd
 from io import BytesIO
 from flask import send_file
 import os
+import tempfile
+from utils.validators import validate_json_params, validate_form_params
 
 classroom_bp = Blueprint('classroom', __name__)
 
@@ -158,6 +160,7 @@ def get_topics(course_id):
     return jsonify({"status": "success", "topics": topics})
 
 @classroom_bp.route('/api/classroom/topics/create', methods=['POST'])
+@validate_json_params('course_id')
 def create_topics():
     if not extensions.classroom_integration: return jsonify({"status": "error"}), 500
     data = request.json
@@ -169,6 +172,7 @@ def create_topics():
     return jsonify({"status": "success", "message": f"已建立 {len(created)} 個主題"})
 
 @classroom_bp.route('/api/classroom/assignment/create', methods=['POST'])
+@validate_form_params('course_id', 'title')
 def create_assignment():
     if not extensions.classroom_integration: return jsonify({"status": "error"}), 500
     
@@ -187,19 +191,21 @@ def create_assignment():
     drive_file_ids = []
     if file:
         filename = file.filename
-        upload_path = os.path.join('/tmp', filename)
+        fd, upload_path = tempfile.mkstemp(prefix="synapse_", suffix=f"_{filename}")
+        os.close(fd)
         file.save(upload_path)
         
-        # Determine Folder: Classroom/<Course>/Assignments
-        folder_id = extensions.classroom_integration.ensure_course_folder_structure(course_name, "Assignments")
-        
-        file_id = extensions.classroom_integration.upload_file_to_drive(upload_path, parent_id=folder_id)
-        if file_id:
-            drive_file_ids.append(file_id)
-        
-        # Cleanup temp file
-        if os.path.exists(upload_path):
-            os.remove(upload_path)
+        try:
+            # Determine Folder: Classroom/<Course>/Assignments
+            folder_id = extensions.classroom_integration.ensure_course_folder_structure(course_name, "Assignments")
+            
+            file_id = extensions.classroom_integration.upload_file_to_drive(upload_path, parent_id=folder_id)
+            if file_id:
+                drive_file_ids.append(file_id)
+        finally:
+            # Cleanup temp file securely
+            if os.path.exists(upload_path):
+                os.remove(upload_path)
 
     # Pre-process max_points
     max_pts = data.get('max_points')
@@ -247,6 +253,7 @@ def create_assignment():
         return jsonify({"status": "error", "message": "建立作業失敗"}), 500
 
 @classroom_bp.route('/api/classroom/material/create', methods=['POST'])
+@validate_form_params('course_id', 'title')
 def create_material():
     if not extensions.classroom_integration: return jsonify({"status": "error"}), 500
     
@@ -265,15 +272,17 @@ def create_material():
     file_id = None
     if file:
         filename = file.filename
-        upload_path = os.path.join('/tmp', filename)
+        fd, upload_path = tempfile.mkstemp(prefix="synapse_", suffix=f"_{filename}")
+        os.close(fd)
         file.save(upload_path)
         
-        # Determine Folder
-        folder_id = extensions.classroom_integration.ensure_course_folder_structure(course_name, "Materials")
-        file_id = extensions.classroom_integration.upload_file_to_drive(upload_path, parent_id=folder_id)
-        
-        if os.path.exists(upload_path):
-            os.remove(upload_path)
+        try:
+            # Determine Folder
+            folder_id = extensions.classroom_integration.ensure_course_folder_structure(course_name, "Materials")
+            file_id = extensions.classroom_integration.upload_file_to_drive(upload_path, parent_id=folder_id)
+        finally:    
+            if os.path.exists(upload_path):
+                os.remove(upload_path)
 
     res = extensions.classroom_integration.create_course_material(
         course_id=course_id,

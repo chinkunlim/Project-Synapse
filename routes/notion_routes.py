@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify, Response
 import os
-from dotenv import set_key, load_dotenv
+from dotenv import set_key
 from pathlib import Path
 import extensions
-from utils.google_calendar_sync import GoogleCalendarIntegration
+from integrations.google_calendar_sync import GoogleCalendarIntegration
+from utils.task_queue import submit_task
 import json
 
 notion_bp = Blueprint('notion', __name__)
@@ -48,7 +49,6 @@ def setup_notion():
 
 @notion_bp.route('/notion')
 def notion_management():
-    load_dotenv(override=True)
     api_key = os.getenv("NOTION_API_KEY")
     parent_id = os.getenv("PARENT_PAGE_ID")
     task_db = os.getenv("TASK_DATABASE_ID")
@@ -75,16 +75,6 @@ def handle_notion_action():
     action = data.get("action")
     version = data.get("version", "initial") # 預設使用初始版
     
-    if action == "init_all":
-        use_latest = (version == "latest")
-        success = extensions.notion_processor.initialize_system(
-            os.getenv("PARENT_PAGE_ID"), 
-            use_latest=use_latest
-        )
-        msg = "最新版" if use_latest else "初始版"
-        return jsonify({"status": "success", "message": f"✅ 已使用「{msg}」完成初始化"})
-    
-    load_dotenv(override=True)
     try:
         if not extensions.notion_processor:
             return jsonify({"status": "error", "message": "❌ Notion 處理器未初始化"}), 500
@@ -99,37 +89,23 @@ def handle_notion_action():
         if not parent_id: return jsonify({"status": "error", "message": "❌ 未設置 PARENT_PAGE_ID"}), 400
 
         if action == "build_layout":
-            result = extensions.notion_processor.build_dashboard_layout(parent_id)
-            # 修正：確保 500 錯誤只在失敗時回傳
-            if result:
-                return jsonify({"status": "success", "message": "✅ 佈局構建成功！"})
-            return jsonify({"status": "error", "message": "❌ 佈局構建失敗"}), 500
+            task_id = submit_task(extensions.notion_processor.build_dashboard_layout, parent_id)
+            return jsonify({"status": "processing", "message": "✅ 佈局構建開始在背景執行...", "task_id": task_id})
 
         elif action == "create_databases":
-            result = extensions.notion_processor.create_databases(parent_id)
-            # 修正：確保成功時回傳 200
-            if result:
-                return jsonify({"status": "success", "message": "✅ 數據庫創建成功！"})
-            return jsonify({"status": "error", "message": "❌ 數據庫創建失敗"}), 500
+            task_id = submit_task(extensions.notion_processor.create_databases, parent_id)
+            return jsonify({"status": "processing", "message": "✅ 數據庫創建開始在背景執行...", "task_id": task_id})
         
         elif action == "init_all":
-            # 獲取前端傳來的版本參數 (initial 或 latest)
             version = request.json.get("version", "initial")
             use_latest = (version == "latest")
-            
-            # 呼叫整合後的初始化邏輯
-            result = extensions.notion_processor.initialize_system(parent_id, use_latest=use_latest)
-            
-            if result["success"]:
-                return jsonify({"status": "success", "message": result["message"], "logs": result["logs"]})
-            else:
-                return jsonify({"status": "error", "message": result["message"], "logs": result["logs"]}), 500
+            task_id = submit_task(extensions.notion_processor.initialize_system, parent_id, use_latest=use_latest)
+            return jsonify({"status": "processing", "message": "✅ 系統初始化開始在背景執行...", "task_id": task_id})
             
         elif action == "clean":
-            result = extensions.notion_processor.delete_blocks(parent_id)
-            return jsonify({"status": "success", "message": "🧹 頁面內容與資料庫已清空封存"}) if result else jsonify({"status": "error", "message": "❌ 清空失敗"}), 500
+            task_id = submit_task(extensions.notion_processor.delete_blocks, parent_id)
+            return jsonify({"status": "processing", "message": "🧹 頁面內容清空開始在背景執行...", "task_id": task_id})
 
-        # 修改：重置系統現在只執行「清空」與「解除綁定」，不再自動重建
         elif action == "reset_all":
             logs = []
             
@@ -159,12 +135,61 @@ def handle_notion_action():
             return jsonify({"status": "error", "message": "❌ 同步失敗，請確認 API 權限與資料庫 ID"}), 500
         
         elif action == "list_databases":
-            env_vars = _get_env_values()
-            info = [f"{k}: {'已設置' if v else '未設置'}" for k, v in env_vars.items() if '_ID' in k or 'KEY' in k]
-            return jsonify({"status": "success", "message": "📊 數據庫列表", "logs": info or ["未找到配置"]})
+            from integrations.notion import notion_config
+            schema_path = notion_config.schema_path
+            
+            if not schema_path.exists():
+                return jsonify({"status": "error", "message": "❌ 找不到 Schema 檔案"}), 404
+                
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+            
+            db_configs = schema.get("databases", [])
+            info = []
+            
+            # v3.0 Key 映射轉換
+            key_map = {
+                "SUBJECT_DATABASE_ID": "COURSE_HUB_ID",
+                "COURSE_DATABASE_ID": "CLASS_SESSION_ID",
+                "NOTE_DB_ID": "NOTE_DATABASE_ID",
+                "THEORY_DB_ID": "THEORY_HUB_ID",
+                "PROJECTS_DATABASE_ID": "PROJECT_DATABASE_ID",
+                "RESOURCES_DATABASE_ID": "RESOURCE_DATABASE_ID",
+                "TASK_DB_ID": "TASK_DATABASE_ID"  # 補上任務資料庫的映射
+            }
+
+            for db_cfg in db_configs:
+                orig_key = db_cfg.get("env_key")
+                actual_key = key_map.get(orig_key, orig_key)
+                db_title = db_cfg.get("title")
+                
+                # 1. 先從 Env 讀取
+                db_id = os.getenv(actual_key)
+                source = "(從 Env 讀取)"
+                
+                # 2. 如果 Env 為空，嘗試從 Notion 讀取
+                if not db_id:
+                    db_id = extensions.notion_processor.find_database_by_title(db_title)
+                    if db_id:
+                        source = "(從 Notion 找回並已自動更新 Env)"
+                        # 自動寫回 .env 確保下次不需要重新搜尋
+                        set_key(str(ENV_PATH), actual_key, db_id)
+                
+                if db_id:
+                    # 格式化 ID 顯示 (保留頭尾)
+                    display_id = f"{db_id[:5]}...{db_id[-5:]}"
+                    info.append(f"✅ {db_title}: {display_id} {source}")
+                else:
+                    info.append(f"❌ {db_title}: 未設置")
+
+            return jsonify({
+                "status": "success", 
+                "message": "📊 數據庫連線狀態", 
+                "logs": info if info else ["未找到任何資料庫配置"]
+            })
 
         elif action == "check_schema":
-            from intergrations.notion import notion_config
+            from integrations.notion import notion_config
             schema_path = notion_config.schema_path
             if not schema_path.exists(): return jsonify({"status": "error", "message": f"❌ Schema 不存在"}), 404
             with open(schema_path, 'r', encoding='utf-8') as f: schema = json.load(f)
@@ -197,7 +222,6 @@ def handle_notion_action():
 
 @notion_bp.route('/api/notion/csv/upload', methods=['POST'])
 def upload_csv_to_notion():
-    load_dotenv(override=True)
     try:
         if not extensions.notion_processor: return jsonify({"status": "error", "message": "❌ 未初始化"}), 500
         if 'csv_file' not in request.files: return jsonify({"status": "error", "message": "❌ 未上傳 CSV"}), 400

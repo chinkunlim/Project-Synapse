@@ -9,6 +9,7 @@ from typing import Optional, Dict, Tuple
 import logging
 import sys
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -198,11 +199,25 @@ class GoogleCalendarIntegration:
     def validate_semester_data(semesters: Dict[Tuple[int, int], Dict]) -> Dict[Tuple[int, int], Dict]:
         """
         验证学期数据的完整性
-        确保每个学期都有开始和结束日期
+        确保每个学期都有开始和结束日期，并且排除入學前的學年。
         """
         valid_semesters = {}
         
+        # 讀取使用者設定的入學學年 (例如: 110)
+        enrollment_year_str = os.getenv('ENROLLMENT_YEAR', '').strip()
+        enrollment_year = None
+        if enrollment_year_str.isdigit():
+            enrollment_year = int(enrollment_year_str)
+            logger.info(f"配置了入學學年: {enrollment_year}，將忽略此之前的學期資料")
+        
         for key, value in semesters.items():
+            year, semester = key
+            
+            # 過濾掉早於入學學年的資料
+            if enrollment_year and year < enrollment_year:
+                logger.debug(f"學期 {key} 早於入學學年 ({enrollment_year})，已跳過同步")
+                continue
+                
             if 'start' in value and 'end' in value:
                 if value['start'] < value['end']:
                     valid_semesters[key] = value
