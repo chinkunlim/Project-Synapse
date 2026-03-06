@@ -1,93 +1,144 @@
-# 🚀 Project Synapse: Getting Started Guide
+# 🚀 Getting Started — Project Synapse
 
-Welcome to **Project Synapse**, an advanced AI-powered teaching assistant dashboard designed to streamline your academic workflow. This system integrates **Notion**, **Google Classroom**, **N8N Automation**, and **PDF Processing** into a single, unified interface.
+Welcome to **Project Synapse**, an AI-powered academic management dashboard for university instructors. It integrates **Notion**, **Google Classroom**, **Google Calendar**, **N8N Automation**, and **PDF Processing** into a single, unified interface.
+
+> **Access**: `http://localhost:5003` | N8N: `http://localhost:5678` | Notion Admin: `http://localhost:5003/notion`
 
 ---
 
 ## 1. System Requirements
 
-Before you begin, please ensure your system meets the following requirements:
-
-*   **Operating System**: macOS, Linux, or Windows (WSL2 recommended).
-*   **Python**: Version 3.10 or higher.
-*   **Docker Desktop**: Required for running N8N and the PDF generation service.
-*   **Git**: For version control and code management.
+| Requirement | Details |
+|---|---|
+| OS | macOS, Linux, or Windows (WSL2 recommended) |
+| Python | 3.10 or higher |
+| Docker Desktop | Required (runs N8N + PDF service) |
+| Git | For code management |
 
 ---
 
 ## 2. Installation & Setup
 
 ### Step 1: Clone the Repository
-Open your terminal and clone the project to your local machine:
 ```bash
-git clone https://github.com/your-repo/project-synapse.git
-cd project-synapse
+git clone https://github.com/chinkunlim/Project-Synapse.git
+cd Project-Synapse
 ```
 
-### Step 2: Environment Configuration
-The system relies on a `.env` file for sensitive keys. Copy the example file:
-```bash
-cp .env.example .env
-```
-Open `.env` and fill in the following critical keys:
-*   `NOTION_API_KEY`: Your internal integration token from Notion.
-*   `NOTION_PARENT_PAGE_ID`: The ID of the page where the dashboard will live.
-*   `FLASK_SECRET_KEY`: A random string for session security.
-*   `GOOGLE_CREDENTIALS_FILE`: Path to your OAuth JSON file (default: `google_credentials.json`).
+### Step 2: Configure Environment Variables
+Create a `.env` file at the project root:
+```env
+# Notion
+NOTION_API_KEY=your_integration_token
+PARENT_PAGE_ID=your_parent_page_id
 
-### Step 3: Install Python Dependencies
-It is recommended to use a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Databases (auto-filled after first sync)
+COURSE_HUB_ID=
+CLASS_SESSION_ID=
+TASK_DATABASE_ID=
+NOTE_DATABASE_ID=
+RESOURCE_DATABASE_ID=
+THEORY_HUB_ID=
+
+# Settings
+ENROLLMENT_YEAR=114
+
+# N8N
+N8N_BASE_URL=http://n8n:5678
+N8N_API_KEY=
 ```
 
-### Step 4: Start Background Services
-Project Synapse uses Docker for its heavy lifting (N8N and LaTeX). Start them with:
-```bash
-docker-compose up -d
-```
-*Wait for a few minutes for N8N to fully initialize.*
+> **How to get `PARENT_PAGE_ID`**: Open your Notion page in the browser. The last 32-character segment of the URL is the page ID.
 
-### Step 5: Launch the Application
-Start the main Flask server:
+### Step 3: Start the Application
 ```bash
-python app.py
+docker-compose up -d --build
 ```
-You should see output indicating the server is running on `http://127.0.0.1:5000`.
+
+The dashboard will be available at **http://localhost:5003**.
+
+> **First launch** may take 1–2 minutes while N8N initializes.
 
 ---
 
-## 3. First-Run Initialization
+## 3. Notion Integration Setup
 
-Once the server is running, open your browser to **http://localhost:5000**.
+### Step 1: Create a Notion Integration
+1. Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
+2. Click **New Integration** → Name it "Project Synapse"
+3. Copy the **Internal Integration Token** → paste as `NOTION_API_KEY`
 
-1.  **Login**: Access the dashboard.
-2.  **Go to Settings**: Click the **Settings** link in the top navigation bar.
-3.  **Check Connections**: Ensure the "System Status" indicators are green.
-4.  **Initialize Notion**:
-    *   Navigate to **Notion Admin**.
-    *   Locate the "Fast Setup" card.
-    *   Click **"一鍵初始化所有" (One-Click Init)**.
-    *   *This process will create the necessary Parent Page and Databases in your Notion workspace automatically.*
+### Step 2: Share Your Dashboard Page
+1. Open your Notion Dashboard page
+2. Click **`...`** (top right) → **Connections** → find your integration
+3. Select **"Apply to all sub-pages"** ✅
 
----
+> This is **critical** — without this step, databases inside sub-pages won't be accessible via the API.
 
-## 4. Troubleshooting Common Issues
-
-### 🔴 Server Won't Start
-*   **Port in Use**: Check if port `5000` is occupied. You can change the port in `app.py`.
-*   **Missing Keys**: Ensure `.env` exists and has valid values.
-
-### 🟡 Notion Sync Failed
-*   **Permission Error**: Verify that your Notion Integration is invited to the `Parent Page`.
-*   **Invalid ID**: Double-check the `NOTION_PARENT_PAGE_ID`.
-
-### 🔵 N8N Not Accessible
-*   Ensure Docker is running (`docker ps`).
-*   Check if N8N is ready at `http://localhost:5678`.
+### Step 3: Sync Database IDs
+1. Go to `http://localhost:5003/notion`
+2. Under **Database Status**, click **🔄 Sync Status**
+3. The system will automatically find and save all database IDs into `.env`
+4. **Restart Docker** to apply the saved IDs:
+   ```bash
+   docker-compose down && docker-compose up -d
+   ```
 
 ---
 
-> **Ready to go?** Proceed to the [User Manual](3_USER_MANUAL.md) to learn how to use the dashboard features.
+## 4. N8N Automation Setup
+
+1. Open [http://localhost:5678](http://localhost:5678) and log in
+2. Go to **Settings → API** → Create an API Key
+3. Enter the key in **System Admin → System Settings → `N8N_API_KEY`**
+4. Restart Docker
+
+> **Safari users**: n8n requires HTTPS cookies. The docker-compose already sets `N8N_SECURE_COOKIE=false` for local access.
+
+---
+
+## 5. Google Classroom Setup
+
+### Step 1: Google Cloud Console
+1. Visit [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable: **Google Classroom API** and **Google Drive API**
+
+### Step 2: OAuth Credentials
+1. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+2. Application type: **Web Application**
+3. Authorized redirect URI: `http://localhost:5003/api/classroom/auth/callback`
+4. Download the JSON → rename to `google_credentials.json` → place in `config/`
+
+### Step 3: Required OAuth Scopes
+```
+https://www.googleapis.com/auth/classroom.courses.readonly
+https://www.googleapis.com/auth/classroom.rosters.readonly
+https://www.googleapis.com/auth/classroom.topics
+https://www.googleapis.com/auth/classroom.courseworkmaterials
+https://www.googleapis.com/auth/classroom.coursework.me
+https://www.googleapis.com/auth/drive.file
+```
+
+> **Local HTTP issue**: Add `OAUTHLIB_INSECURE_TRANSPORT=1` to `.env` for local development with HTTP callbacks.
+
+### Step 4: First-Time Authentication
+1. Go to `http://localhost:5003/classroom`
+2. Click **Connect Google Classroom**
+3. Complete the Google authorization flow
+4. Credentials save automatically to `config/google_token.pickle`
+
+---
+
+## 6. Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| Dashboard not loading | Check `docker ps` — ensure all 3 containers are running |
+| Notion databases not found | Re-share the parent page with your integration (include sub-pages) |
+| Database IDs lost after rebuild | After Docker restart, go to Notion Admin and click **Sync Status** |
+| Google Classroom auth fails | Delete `config/google_token.pickle` and re-authenticate |
+| N8N not accessible in Safari | Ensure `N8N_SECURE_COOKIE=false` is in docker-compose.yml |
+
+---
+
+> **Next steps**: See [User Manual](3_USER_MANUAL.md) for feature walkthroughs, or [Admin Handbook](2_ADMIN_HANDBOOK.md) for system management.

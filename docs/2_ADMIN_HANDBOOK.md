@@ -1,101 +1,209 @@
-# 🛡️ Administrator Handbook
+# 🛡️ Administrator Handbook — Project Synapse
 
-This document is intended for system administrators responsible for maintaining, securing, and configuring **Project Synapse**.
-
----
-
-## 1. System Architecture Overview
-
-Project Synapse operates as a microservice-lite architecture:
-
-### **Core Components**
-1.  **Web Server (Flask)**:
-    *   Handles all HTTP requests, routing, and UI rendering.
-    *   Manages sessions and authentication logic.
-    *   Located in `app.py` and `routes/`.
-
-2.  **Database & Storage**:
-    *   **Notion**: Acts as the primary CMS/Database for tasks, courses, and schedules.
-    *   **Local Filesystem**: Stores uploaded PDFs temporarily and configuration files.
-
-3.  **Background Engines (Docker)**:
-    *   **N8N (Automation)**: Runs localized automation workflows. Exposed on port `5678`.
-    *   **PDF Service**: A specialized container for compiling LaTeX documents into PDFs.
+This document is for administrators responsible for configuring, securing, and maintaining **Project Synapse**.
 
 ---
 
-## 2. Configuration & Security
+## 1. System Architecture
 
-### 🔐 Managing Secrets
-All sensitive configuration is managed via the **Settings Page** (`/admin`) or directly in the `.env` file.
+Project Synapse uses a **microservice-lite** architecture:
 
-*   **NOTION_API_KEY**: Grants full access to the workspace. **Rotate this key immediately if compromised.**
-*   **FLASK_SECRET_KEY**: Encrypts user sessions. Change this whenever you deploy to a new environment.
-*   **GOOGLE_CREDENTIALS**: OAuth tokens are stored in `google_credentials.json`. Ensure this file has strict file permissions (`chmod 600`).
-
-### 🛡️ Security Best Practices
-1.  **Access Control**: Ensure the `/admin` route is protected (if deployed publicly). Currently, it relies on local access or basic auth (if configured).
-2.  **Firewall**: If hosting on a server, only expose ports `5000` (Web) and optionally `5678` (N8N) if needed.
-3.  **Updates**: regular `docker-compose pull` to keep N8N and PDF services patched.
-
----
-
-## 3. Database Schema & Synchronization
-
-Project Synapse enforces a strict schema on Notion databases to ensure the UI works correctly.
-
-### **Database Structure**
-*   **Overview (Parent Page)**: The root of the system.
-*   **Tasks DB** (Master Tag Database): Stores all action items.
-*   **Course Schedule DB**: Stores academic calendar items.
-*   **Thesis DB**: Tracks PDF generation history.
-
-### **Disaster Recovery**
-If a user accidentally deletes a database or property in Notion:
-1.  Go to **Notion Admin** page.
-2.  Use the **"Database Health Check"** tool to identify missing connections.
-3.  Click **"Re-initialize"** to recreate the missing structures.
-    *   *Note: This will create NEW databases; it cannot restore deleted data from Notion's trash.*
-
----
-
----
-
-## 4. Data Import & Sync
-
-### **Google Calendar Synchronization**
-The system syncs semester start/end dates from the "Project Synapse" Google Calendar using smart keyword matching:
-*   **Semester Start**: Prioritizes events exactly named **"全校開始上課"** (Start of all classes). If not found, falls back to generic "Start" events.
-*   **Semester End**: Identified by **"寒假開始"** (Winter Break) or **"暑假開始"** (Summer Break). The semester end date is automatically set to **one day before** the break starts.
-*   **18-Week Rule**: The system strictly limits auto-generated sessions to 18 weeks from the first class date.
-
-### **CSV Import Specification**
-When uploading `Courses` via CSV, the following logic applies:
-*   **Format**: Standard CSV with headers `Name`, `Year`, `Semester`, `Schedule`.
-*   **BOM Handling**: The system automatically strips Byte Order Marks (BOM) from Excel-exported files.
-*   **Empty Rows**: Completely empty rows are automatically filtered out to prevent duplicate phantom courses.
-*   **Session Merging**: Consecutive class periods on the same day (e.g., periods 2, 3, 4) are merged into a single session entry.
-
----
-
-## 5. Maintenance Operations
-
-### **Log Management**
-The system logs events to the browser console and server stdout.
-*   **Server Logs**: Check your terminal or Docker logs for backend traceback errors.
-*   **Browser Console**: Use the in-app "Global Console" for operation history.
-
-### **Updating the Application**
-To update Project Synapse code:
-```bash
-git pull origin main
-pip install -r requirements.txt  # If dependencies changed
-docker-compose up -d --build     # If docker services changed
-python app.py                    # Restart server
+```
+[Browser]
+    ↕ HTTP
+[Flask Dashboard] ←→ [Notion API]
+    ↕                ↕
+[N8N Container]  [Google APIs]
+    ↕
+[PDF Worker Container]
 ```
 
-### **Google Token Refresh**
-If Google integration stops working (e.g., Classroom sync fails):
-1.  Delete the `tokens/` directory or `token.json`.
-2.  Go to the **Classroom** page and click "Connect".
-3.  Re-authenticate to generate a fresh token.
+### Containers
+
+| Container | Port | Purpose |
+|---|---|---|
+| `dashboard` | 5003 | Main Flask web application |
+| `n8n` | 5678 | Automation workflows |
+| `pdf-worker` | 5002 | LaTeX → PDF compilation |
+
+### Key Directories
+
+```
+project/
+├── app.py                  # Flask factory
+├── extensions.py           # Global Singleton initialization
+├── routes/                 # API Blueprint handlers (by domain)
+├── integrations/           # All external API adapters
+│   ├── notion/             # Notion client, processor, config
+│   ├── google_classroom_integration.py
+│   ├── google_calendar_sync.py
+│   └── google_ndhu_integration.py
+├── utils/                  # Internal helpers (no external API deps)
+│   ├── task_queue.py       # Background ThreadPoolExecutor
+│   ├── validators.py       # @validate_json_params decorator
+│   ├── errors.py           # Global error handler with Trace IDs
+│   ├── env_manager.py      # .env read/write helpers
+│   └── logger.py           # Centralized logging
+├── config/                 # Static configuration
+│   ├── config.py           # Flask Config class
+│   ├── course_schedule_config.py
+│   └── notion_schema.json  # Database schema definition
+├── templates/              # Jinja2 HTML templates
+├── static/                 # CSS / JS / images
+├── docs/                   # Documentation (this folder)
+├── scripts/                # One-off maintenance scripts
+└── tests/                  # Integration test scripts
+```
+
+---
+
+## 2. Environment Variables Reference
+
+Managed via `.env` file and the **System Admin → System Settings** UI.
+
+### Notion Configuration
+
+| Variable | Description |
+|---|---|
+| `NOTION_API_KEY` | Internal Integration token from notion.so/my-integrations |
+| `PARENT_PAGE_ID` | ID of the top-level Dashboard page in Notion |
+
+### Active Database IDs
+Auto-populated by the Sync Status feature:
+
+| Variable | Database |
+|---|---|
+| `COURSE_HUB_ID` | Course Hub |
+| `CLASS_SESSION_ID` | Class Sessions |
+| `TASK_DATABASE_ID` | Tasks |
+| `NOTE_DATABASE_ID` | Lecture Notes |
+| `RESOURCE_DATABASE_ID` | Resources |
+| `THEORY_HUB_ID` | Theory Hub |
+
+### Other Settings
+
+| Variable | Description |
+|---|---|
+| `ENROLLMENT_YEAR` | ROC year of enrollment (e.g., `113`). Filters past semesters in Calendar sync. |
+| `N8N_BASE_URL` | Internal Docker URL: `http://n8n:5678` |
+| `N8N_API_KEY` | API key generated from N8N Settings → API |
+
+---
+
+## 3. Security Best Practices
+
+1. **Secrets in `.env`**: Never commit `.env` to version control. It is in `.gitignore`.
+2. **Credential files**: `config/google_*.json` and `config/google_token*.pickle` are also gitignored. Set `chmod 600` permissions.
+3. **Masked UI**: The System Settings UI masks all `*_ID` and `*_KEY` fields by default.
+4. **N8N Cookies**: `N8N_SECURE_COOKIE=false` is set for local-only access. Change this if exposing N8N publicly via HTTPS.
+5. **Notion Integration**: Only grant access to pages/databases the integration needs. Use the "Apply to sub-pages" option carefully.
+
+---
+
+## 4. Data Flow — Course CSV Import
+
+```
+CSV File (user upload)
+    ↓
+course_import_processor.py
+    ├─ Parse rows (中/英文 field names auto-detected)
+    ├─ Strip BOM characters (Excel compatibility)
+    ├─ Filter empty rows
+    └─ Call course_schedule_parser
+         └─ Convert "三9/三10/三11" → 14:10–17:10 Wed
+    ↓
+integrations/notion/processor.py
+    ├─ Write to Course Hub database
+    └─ _generate_course_sessions()
+         ├─ Calculate 18 weekly session dates from semester start
+         ├─ All times in UTC+8 (Taipei)
+         └─ Create 18 Class Session records + Lecture Note pages
+```
+
+### CSV Specifications
+
+- **Encoding**: UTF-8 preferred; BOM is auto-stripped
+- **Empty rows**: Filtered automatically
+- **Merged periods**: Consecutive periods on same day (e.g., 9, 10, 11) are merged into one session
+- **18-week limit**: Strictly limits auto-generated sessions to 18 from the first class date
+
+---
+
+## 5. Google Calendar Semester Sync
+
+The system reads semester dates from a Google Calendar using keyword matching:
+
+| Event Priority | Event Title Pattern | Purpose |
+|---|---|---|
+| High (2) | `全校開始上課` | Exact semester start date |
+| Low (1) | `114-1 Start` | Generic start fallback |
+| Auto-detect | `寒假開始` / `暑假開始` | Semester end (1 day before break) |
+
+**Date Inference**: If event title has no year/semester, the system infers from the month (Feb → Spring, Sept → Fall).
+
+**Enrollment Year Filter**: Set `ENROLLMENT_YEAR` in `.env` to prune semesters before that year from sync results.
+
+---
+
+## 6. Notion Database Auto-Recovery
+
+If database IDs are missing from `.env`, the system uses a **recursive page traversal** algorithm:
+
+1. Start from `PARENT_PAGE_ID`
+2. Fetch all child blocks (up to 2 levels deep)
+3. Match `child_database` blocks by title
+4. Fall back to Notion search API if not found in traversal
+
+> **Why traversal instead of search?** Notion's search API only indexes objects directly shared with the integration at the top level. Nested databases inside sub-pages aren't returned by search — traversal bypasses this limitation.
+
+---
+
+## 7. Maintenance Operations
+
+### Update Application
+```bash
+git pull origin main
+docker-compose up -d --build
+```
+
+### View Logs
+```bash
+# All containers
+docker-compose logs -f
+
+# Dashboard only
+docker logs dashboard -f
+
+# N8N only
+docker logs n8n -f
+```
+
+### Reset Google Token
+```bash
+rm config/google_token.pickle
+# Then re-authenticate from the Classroom page
+```
+
+### Rebuild from Scratch
+```bash
+docker-compose down
+docker-compose up -d --build
+```
+
+---
+
+## 8. Disaster Recovery
+
+### Lost Database IDs
+1. Go to **Notion Admin → Database Status**
+2. Click **🔄 Sync Status** — the system will scan Notion and recover IDs automatically
+3. Restart Docker to apply
+
+### Accidentally Deleted Notion Database
+1. Go to Notion Admin → **Danger Zone** → **Re-initialize**
+2. This creates new empty databases (archived/deleted data is not restored — check Notion Trash)
+
+### Environment Variables Corrupted
+1. Open **System Admin → System Settings**
+2. Manually re-enter the affected values
+3. Restart Docker
